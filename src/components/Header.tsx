@@ -102,7 +102,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAiChat }) => {
         <div className="flex items-center space-x-4">
           <Image src="/cantina-pink-logo.png" alt="Cantina Pink" width={252} height={261} className="h-20 md:h-28 w-auto rounded-lg shrink-0" priority />
           <div>
-            <h1 className="text-lg md:text-xl font-black text-amber-400">Bistro Operativo - Carga Rápida</h1>
+            <h1 className="text-lg md:text-xl font-black text-amber-400">Gestión Financiera, Cheques e IA para Gastronomía</h1>
             <p className="text-xs md:text-sm text-slate-400 hidden sm:block">Consola Simplificada de Operaciones y Data Entry</p>
           </div>
         </div>
