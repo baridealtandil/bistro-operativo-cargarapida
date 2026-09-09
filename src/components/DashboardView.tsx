@@ -140,45 +140,45 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           {/* Card 4: 🚚 Lista de Proveedores */}
           <button
             onClick={() => onNavigate('compras')}
-            className="p-3.5 bg-slate-900 hover:bg-slate-800 border border-slate-700/80 text-white rounded-2xl shadow-lg flex flex-col justify-between h-32 text-left transition-all hover:scale-[1.02] active:scale-95 group"
+            className="p-3.5 bg-gradient-to-br from-amber-600 to-yellow-600 hover:from-amber-500 hover:to-yellow-500 text-slate-950 rounded-2xl shadow-lg border border-amber-400/30 flex flex-col justify-between h-32 text-left transition-all hover:scale-[1.02] active:scale-95 group"
           >
             <div className="flex items-center justify-between w-full">
-              <span className="text-[10px] font-black uppercase tracking-wider bg-slate-800 px-2 py-0.5 rounded-md text-amber-400">Proveedores</span>
-              <Truck className="w-5 h-5 text-amber-400 group-hover:scale-110 transition-transform" />
+              <span className="text-[10px] font-black uppercase tracking-wider bg-black/20 px-2 py-0.5 rounded-md text-slate-950">Proveedores</span>
+              <Truck className="w-5 h-5 text-slate-950 group-hover:scale-110 transition-transform" />
             </div>
             <div>
               <span className="text-sm font-black block leading-tight">Ver Proveedores</span>
-              <span className="text-[10px] text-slate-400 block mt-1">Saldos y Fichas Cta Cte</span>
+              <span className="text-[10px] text-slate-900/80 block mt-1">Saldos y Fichas Cta Cte</span>
             </div>
           </button>
 
           {/* Card 5: ⚙️ Gastos de Funcionamiento */}
           <button
             onClick={() => onNavigate('gastos')}
-            className="p-3.5 bg-slate-900 hover:bg-slate-800 border border-slate-700/80 text-white rounded-2xl shadow-lg flex flex-col justify-between h-32 text-left transition-all hover:scale-[1.02] active:scale-95 group"
+            className="p-3.5 bg-gradient-to-br from-cyan-600 to-blue-700 hover:from-cyan-500 hover:to-blue-600 text-white rounded-2xl shadow-lg border border-cyan-400/30 flex flex-col justify-between h-32 text-left transition-all hover:scale-[1.02] active:scale-95 group"
           >
             <div className="flex items-center justify-between w-full">
-              <span className="text-[10px] font-black uppercase tracking-wider bg-slate-800 px-2 py-0.5 rounded-md text-sky-400">Egresos</span>
-              <Building2 className="w-5 h-5 text-sky-400 group-hover:scale-110 transition-transform" />
+              <span className="text-[10px] font-black uppercase tracking-wider bg-black/20 px-2 py-0.5 rounded-md text-cyan-200">Egresos</span>
+              <Building2 className="w-5 h-5 text-cyan-200 group-hover:scale-110 transition-transform" />
             </div>
             <div>
               <span className="text-sm font-black block leading-tight">Gastos Servicios</span>
-              <span className="text-[10px] text-slate-400 block mt-1">Alquiler, Luz, Gas, POS</span>
+              <span className="text-[10px] text-cyan-100/80 block mt-1">Alquiler, Luz, Gas, POS</span>
             </div>
           </button>
 
           {/* Card 6: 🏛️ Cargar Impuesto / Tasa */}
           <button
             onClick={() => onNavigate('gastos')}
-            className="p-3.5 bg-slate-900 hover:bg-slate-800 border border-slate-700/80 text-white rounded-2xl shadow-lg flex flex-col justify-between h-32 text-left transition-all hover:scale-[1.02] active:scale-95 group"
+            className="p-3.5 bg-gradient-to-br from-fuchsia-600 to-purple-700 hover:from-fuchsia-500 hover:to-purple-600 text-white rounded-2xl shadow-lg border border-fuchsia-400/30 flex flex-col justify-between h-32 text-left transition-all hover:scale-[1.02] active:scale-95 group"
           >
             <div className="flex items-center justify-between w-full">
-              <span className="text-[10px] font-black uppercase tracking-wider bg-slate-800 px-2 py-0.5 rounded-md text-purple-400">Impuestos</span>
-              <Landmark className="w-5 h-5 text-purple-400 group-hover:scale-110 transition-transform" />
+              <span className="text-[10px] font-black uppercase tracking-wider bg-black/20 px-2 py-0.5 rounded-md text-fuchsia-200">Impuestos</span>
+              <Landmark className="w-5 h-5 text-fuchsia-200 group-hover:scale-110 transition-transform" />
             </div>
             <div>
               <span className="text-sm font-black block leading-tight">Impuestos & Tasas</span>
-              <span className="text-[10px] text-slate-400 block mt-1">AFIP, ARBA, Cargas 931</span>
+              <span className="text-[10px] text-fuchsia-100/80 block mt-1">AFIP, ARBA, Cargas 931</span>
             </div>
           </button>
 
@@ -200,15 +200,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           {/* Card 8: 👤 Adelanto / Personal */}
           <button
             onClick={() => onNavigate('empleados')}
-            className="p-3.5 bg-slate-900 hover:bg-slate-800 border border-slate-700/80 text-white rounded-2xl shadow-lg flex flex-col justify-between h-32 text-left transition-all hover:scale-[1.02] active:scale-95 group"
+            className="p-3.5 bg-gradient-to-br from-violet-600 to-indigo-700 hover:from-violet-500 hover:to-indigo-600 text-white rounded-2xl shadow-lg border border-violet-400/30 flex flex-col justify-between h-32 text-left transition-all hover:scale-[1.02] active:scale-95 group"
           >
             <div className="flex items-center justify-between w-full">
-              <span className="text-[10px] font-black uppercase tracking-wider bg-slate-800 px-2 py-0.5 rounded-md text-indigo-400">Personal</span>
-              <Users className="w-5 h-5 text-indigo-400 group-hover:scale-110 transition-transform" />
+              <span className="text-[10px] font-black uppercase tracking-wider bg-black/20 px-2 py-0.5 rounded-md text-violet-200">Personal</span>
+              <Users className="w-5 h-5 text-violet-200 group-hover:scale-110 transition-transform" />
             </div>
             <div>
               <span className="text-sm font-black block leading-tight">Personal & Sueldos</span>
-              <span className="text-[10px] text-slate-400 block mt-1">Registrar sueldo o adelanto</span>
+              <span className="text-[10px] text-violet-100/80 block mt-1">Registrar sueldo o adelanto</span>
             </div>
           </button>
         </div>
