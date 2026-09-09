@@ -13,7 +13,12 @@ import {
   ShoppingBag,
   Building2,
   Landmark,
-  Target
+  Target,
+  Truck,
+  Receipt,
+  CheckSquare,
+  Handshake,
+  Plus
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -76,43 +81,137 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
 
   return (
     <div className="space-y-6 pb-12">
-      {/* BOTONES GIGANTES DE ACCESO RÁPIDO OPERATIVO */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <button
-          onClick={() => onNavigate('ventas')}
-          className="p-5 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white rounded-2xl shadow-xl flex items-center justify-between transition-all group"
-        >
-          <div className="text-left">
-            <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-200 block">Paso 1</span>
-            <span className="text-base md:text-lg font-black block mt-0.5">+ Cargar Venta del Día</span>
-            <span className="text-xs text-emerald-100/80 block mt-0.5">Registrar cierre de turno y caja</span>
-          </div>
-          <TrendingUp className="w-7 h-7 text-emerald-200 group-hover:scale-110 transition-transform shrink-0 ml-2" />
-        </button>
+      {/* HUB DE TARJETAS OPERATIVAS COMPACTAS (CARD LAUNCHPAD) */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-bold text-white flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-amber-400" />
+            Lanzador de Acciones Rápida (Hub de Tarjetas)
+          </h2>
+          <span className="text-xs text-slate-400 font-medium hidden sm:inline">1 Clic para Cargar</span>
+        </div>
 
-        <button
-          onClick={() => onNavigate('compras')}
-          className="p-5 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-slate-950 rounded-2xl shadow-xl flex items-center justify-between transition-all group"
-        >
-          <div className="text-left">
-            <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-900/80 block">Paso 2</span>
-            <span className="text-base md:text-lg font-black block mt-0.5">+ Cargar Factura / Compra</span>
-            <span className="text-xs text-slate-900/80 block mt-0.5">Ingresar remito o factura recibida</span>
-          </div>
-          <ShoppingBag className="w-7 h-7 text-slate-950 group-hover:scale-110 transition-transform shrink-0 ml-2" />
-        </button>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          {/* Card 1: + Cargar Venta */}
+          <button
+            onClick={() => onNavigate('ventas')}
+            className="p-3.5 bg-gradient-to-br from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white rounded-2xl shadow-lg border border-emerald-500/30 flex flex-col justify-between h-32 text-left transition-all hover:scale-[1.02] active:scale-95 group"
+          >
+            <div className="flex items-center justify-between w-full">
+              <span className="text-[10px] font-black uppercase tracking-wider bg-black/20 px-2 py-0.5 rounded-md text-emerald-200">Ventas</span>
+              <TrendingUp className="w-5 h-5 text-emerald-200 group-hover:scale-110 transition-transform" />
+            </div>
+            <div>
+              <span className="text-sm font-black block leading-tight">+ Cargar Venta</span>
+              <span className="text-[10px] text-emerald-100/80 block mt-1">Cierre de turno y caja</span>
+            </div>
+          </button>
 
-        <button
-          onClick={() => onNavigate('gastos')}
-          className="p-5 bg-gradient-to-r from-sky-600 to-blue-700 hover:from-sky-500 hover:to-blue-600 text-white rounded-2xl shadow-xl flex items-center justify-between transition-all group"
-        >
-          <div className="text-left">
-            <span className="text-[10px] font-extrabold uppercase tracking-wider text-sky-200 block">Paso 3</span>
-            <span className="text-base md:text-lg font-black block mt-0.5">+ Registrar Pago Realizado</span>
-            <span className="text-xs text-sky-100/80 block mt-0.5">Efectivo, MercadoPago o Banco</span>
-          </div>
-          <DollarSign className="w-7 h-7 text-sky-200 group-hover:scale-110 transition-transform shrink-0 ml-2" />
-        </button>
+          {/* Card 2: + Cargar Factura / Remito */}
+          <button
+            onClick={() => onNavigate('compras')}
+            className="p-3.5 bg-gradient-to-br from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-slate-950 rounded-2xl shadow-lg border border-amber-500/30 flex flex-col justify-between h-32 text-left transition-all hover:scale-[1.02] active:scale-95 group"
+          >
+            <div className="flex items-center justify-between w-full">
+              <span className="text-[10px] font-black uppercase tracking-wider bg-black/20 px-2 py-0.5 rounded-md text-slate-900">Compras</span>
+              <ShoppingBag className="w-5 h-5 text-slate-950 group-hover:scale-110 transition-transform" />
+            </div>
+            <div>
+              <span className="text-sm font-black block leading-tight">+ Cargar Factura</span>
+              <span className="text-[10px] text-slate-900/80 block mt-1">Remitos e insumos</span>
+            </div>
+          </button>
+
+          {/* Card 3: + Registrar Pago Proveedor */}
+          <button
+            onClick={() => onNavigate('gastos')}
+            className="p-3.5 bg-gradient-to-br from-sky-600 to-blue-700 hover:from-sky-500 hover:to-blue-600 text-white rounded-2xl shadow-lg border border-sky-500/30 flex flex-col justify-between h-32 text-left transition-all hover:scale-[1.02] active:scale-95 group"
+          >
+            <div className="flex items-center justify-between w-full">
+              <span className="text-[10px] font-black uppercase tracking-wider bg-black/20 px-2 py-0.5 rounded-md text-sky-200">Pagos</span>
+              <DollarSign className="w-5 h-5 text-sky-200 group-hover:scale-110 transition-transform" />
+            </div>
+            <div>
+              <span className="text-sm font-black block leading-tight">+ Registrar Pago</span>
+              <span className="text-[10px] text-sky-100/80 block mt-1">Efectivo, MP o Banco</span>
+            </div>
+          </button>
+
+          {/* Card 4: 🚚 Lista de Proveedores */}
+          <button
+            onClick={() => onNavigate('compras')}
+            className="p-3.5 bg-slate-900 hover:bg-slate-800 border border-slate-700/80 text-white rounded-2xl shadow-lg flex flex-col justify-between h-32 text-left transition-all hover:scale-[1.02] active:scale-95 group"
+          >
+            <div className="flex items-center justify-between w-full">
+              <span className="text-[10px] font-black uppercase tracking-wider bg-slate-800 px-2 py-0.5 rounded-md text-amber-400">Proveedores</span>
+              <Truck className="w-5 h-5 text-amber-400 group-hover:scale-110 transition-transform" />
+            </div>
+            <div>
+              <span className="text-sm font-black block leading-tight">Ver Proveedores</span>
+              <span className="text-[10px] text-slate-400 block mt-1">Saldos y Fichas Cta Cte</span>
+            </div>
+          </button>
+
+          {/* Card 5: ⚙️ Gastos de Funcionamiento */}
+          <button
+            onClick={() => onNavigate('gastos')}
+            className="p-3.5 bg-slate-900 hover:bg-slate-800 border border-slate-700/80 text-white rounded-2xl shadow-lg flex flex-col justify-between h-32 text-left transition-all hover:scale-[1.02] active:scale-95 group"
+          >
+            <div className="flex items-center justify-between w-full">
+              <span className="text-[10px] font-black uppercase tracking-wider bg-slate-800 px-2 py-0.5 rounded-md text-sky-400">Egresos</span>
+              <Building2 className="w-5 h-5 text-sky-400 group-hover:scale-110 transition-transform" />
+            </div>
+            <div>
+              <span className="text-sm font-black block leading-tight">Gastos Servicios</span>
+              <span className="text-[10px] text-slate-400 block mt-1">Alquiler, Luz, Gas, POS</span>
+            </div>
+          </button>
+
+          {/* Card 6: 🏛️ Cargar Impuesto / Tasa */}
+          <button
+            onClick={() => onNavigate('gastos')}
+            className="p-3.5 bg-slate-900 hover:bg-slate-800 border border-slate-700/80 text-white rounded-2xl shadow-lg flex flex-col justify-between h-32 text-left transition-all hover:scale-[1.02] active:scale-95 group"
+          >
+            <div className="flex items-center justify-between w-full">
+              <span className="text-[10px] font-black uppercase tracking-wider bg-slate-800 px-2 py-0.5 rounded-md text-purple-400">Impuestos</span>
+              <Landmark className="w-5 h-5 text-purple-400 group-hover:scale-110 transition-transform" />
+            </div>
+            <div>
+              <span className="text-sm font-black block leading-tight">Impuestos & Tasas</span>
+              <span className="text-[10px] text-slate-400 block mt-1">AFIP, ARBA, Cargas 931</span>
+            </div>
+          </button>
+
+          {/* Card 7: 📝 Cheques & Cuentas */}
+          <button
+            onClick={() => onNavigate('cheques')}
+            className="p-3.5 bg-gradient-to-br from-purple-700 to-indigo-800 hover:from-purple-600 hover:to-indigo-700 text-white rounded-2xl shadow-lg border border-purple-500/30 flex flex-col justify-between h-32 text-left transition-all hover:scale-[1.02] active:scale-95 group"
+          >
+            <div className="flex items-center justify-between w-full">
+              <span className="text-[10px] font-black uppercase tracking-wider bg-black/20 px-2 py-0.5 rounded-md text-purple-200">Chequera</span>
+              <CheckSquare className="w-5 h-5 text-purple-200 group-hover:scale-110 transition-transform" />
+            </div>
+            <div>
+              <span className="text-sm font-black block leading-tight">+ Cheque / Chequera</span>
+              <span className="text-[10px] text-purple-100/80 block mt-1">Cheques diferidos y cobros</span>
+            </div>
+          </button>
+
+          {/* Card 8: 👤 Adelanto / Personal */}
+          <button
+            onClick={() => onNavigate('empleados')}
+            className="p-3.5 bg-slate-900 hover:bg-slate-800 border border-slate-700/80 text-white rounded-2xl shadow-lg flex flex-col justify-between h-32 text-left transition-all hover:scale-[1.02] active:scale-95 group"
+          >
+            <div className="flex items-center justify-between w-full">
+              <span className="text-[10px] font-black uppercase tracking-wider bg-slate-800 px-2 py-0.5 rounded-md text-indigo-400">Personal</span>
+              <Users className="w-5 h-5 text-indigo-400 group-hover:scale-110 transition-transform" />
+            </div>
+            <div>
+              <span className="text-sm font-black block leading-tight">Personal & Sueldos</span>
+              <span className="text-[10px] text-slate-400 block mt-1">Registrar sueldo o adelanto</span>
+            </div>
+          </button>
+        </div>
       </div>
 
       {/* Saludo y Resumen rápido */}
