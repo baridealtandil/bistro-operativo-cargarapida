@@ -579,13 +579,23 @@ export const SuppliersView: React.FC = () => {
                           </span>
                         )}
                       </td>
-                      <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                      <td className="py-3.5 px-4 text-right whitespace-nowrap space-x-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleStartEditSupplier(sup);
+                          }}
+                          className="bg-amber-500/10 hover:bg-amber-500 hover:text-slate-950 text-amber-300 border border-amber-500/30 px-3 py-1.5 rounded-xl font-bold text-xs transition-all inline-flex items-center gap-1.5 shadow-sm"
+                          title="Cargar o modificar saldo inicial y datos del proveedor"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" /> Editar Saldo Inicial
+                        </button>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             setSelectedCcSupplierId(sup.id);
                           }}
-                          className="bg-slate-800 group-hover:bg-amber-500 group-hover:text-slate-950 text-slate-300 border border-slate-700 px-3 py-1.5 rounded-xl font-bold text-xs transition-all inline-flex items-center gap-1.5 shadow-sm"
+                          className="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-3 py-1.5 rounded-xl font-bold text-xs transition-all inline-flex items-center gap-1.5 shadow-sm"
                         >
                           <BookOpen className="w-3.5 h-3.5" /> Ver Ficha / Cta Cte
                         </button>
@@ -617,7 +627,7 @@ export const SuppliersView: React.FC = () => {
             </p>
           </div>
           
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <label className="text-xs text-slate-400 font-medium">Seleccionar Proveedor:</label>
             <select
               value={selectedCcSupplierId || (suppliers[0]?.id ?? '')}
@@ -633,6 +643,16 @@ export const SuppliersView: React.FC = () => {
                 );
               })}
             </select>
+            <button
+              onClick={() => {
+                const currentSup = suppliers.find(s => s.id === (selectedCcSupplierId || suppliers[0]?.id)) || suppliers[0];
+                if (currentSup) handleStartEditSupplier(currentSup);
+              }}
+              className="bg-amber-500 hover:bg-amber-400 text-slate-950 px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-md"
+              title="Modificar saldo inicial del proveedor seleccionado"
+            >
+              <Edit2 className="w-3.5 h-3.5" /> Cargar / Editar Saldo Inicial
+            </button>
           </div>
         </div>
 
