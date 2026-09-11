@@ -20,7 +20,9 @@ import {
   Tag,
   Info,
   Clock,
-  ShieldCheck
+  ShieldCheck,
+  Edit2,
+  Check
 } from 'lucide-react';
 import { DateRangePicker } from './DateRangePicker';
 
@@ -52,6 +54,21 @@ export default function MercadoPagoReconciliationView({
   const [filterStatus, setFilterStatus] = useState<'ALL' | 'INCOMES' | 'EGRESOS' | 'RECONCILED'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [showSirtacInfo, setShowSirtacInfo] = useState(false);
+  const [showEgresosInfo, setShowEgresosInfo] = useState(false);
+
+  // Manual additional CBU egresos state (persisted in localStorage)
+  const [manualEgresos, setManualEgresos] = useState<number>(0);
+  const [isEditingManualEgresos, setIsEditingManualEgresos] = useState<boolean>(false);
+  const [tempManualInput, setTempManualInput] = useState<string>('0');
+
+  useEffect(() => {
+    const saved = localStorage.getItem('mp_manual_egresos');
+    if (saved) {
+      const val = Number(saved) || 0;
+      setManualEgresos(val);
+      setTempManualInput(String(val));
+    }
+  }, []);
 
   const fetchReconciliation = async () => {
     setLoading(true);
@@ -79,6 +96,13 @@ export default function MercadoPagoReconciliationView({
   useEffect(() => {
     fetchReconciliation();
   }, [startDate, endDate]);
+
+  const saveManualEgresos = () => {
+    const val = Number(tempManualInput) || 0;
+    setManualEgresos(val);
+    localStorage.setItem('mp_manual_egresos', String(val));
+    setIsEditingManualEgresos(false);
+  };
 
   const rows = data?.reconciliationRows || [];
 
@@ -108,6 +132,9 @@ export default function MercadoPagoReconciliationView({
   const availableBal = kpis.availableBalance || 3174854.02;
   const pendingBal = kpis.pendingLiquidation || 2562171.49;
   const consolidatedBal = availableBal + pendingBal;
+
+  const apiEgresos = kpis.mpEgresosTotal || 0;
+  const totalConsolidatedEgresos = apiEgresos + manualEgresos;
 
   return (
     <div className="space-y-6">
@@ -175,7 +202,7 @@ export default function MercadoPagoReconciliationView({
         </div>
       )}
 
-      {/* Explicación Profesional SIRTAC Box (Toggle View) */}
+      {/* Explicación SIRTAC Modal / Info Box */}
       {showSirtacInfo && (
         <div className="p-4 bg-indigo-950/60 border border-indigo-500/40 rounded-2xl text-indigo-200 text-xs space-y-2 animate-in fade-in duration-200">
           <div className="flex items-center justify-between font-bold text-sm text-indigo-300">
@@ -191,13 +218,37 @@ export default function MercadoPagoReconciliationView({
             </button>
           </div>
           <p>
-            • <strong>SIRTAC (Sistema de Recaudación sobre Tarjetas de Crédito y Compra)</strong>: Es la retención a cuenta del <strong>Impuesto a los Ingresos Brutos (IIBB)</strong> que Mercado Pago aplica automáticamente por cada venta cobrada con tarjeta o QR según la alícuota de tu jurisdicción (ejemplo: 1.5% en Provincia de Buenos Aires / ARBA).
+            • <strong>SIRTAC (Sistema de Recaudación sobre Tarjetas de Crédito y Compra)</strong>: Retención a cuenta del <strong>Impuesto a los Ingresos Brutos (IIBB)</strong> que Mercado Pago aplica automáticamente por cada venta cobrada con tarjeta o QR (1.5% en BsAs / ARBA).
           </p>
           <p>
-            • <strong>Impuesto a los Débitos y Créditos (Ley 25.413)</strong>: Es la percepción impositiva bancaria (0,6%) aplicada sobre cobros con tarjetas de débito/crédito.
+            • <strong>Impuesto a los Débitos y Créditos (Ley 25.413)</strong>: Percepción impositiva bancaria (0,6%) sobre cobros con tarjetas.
           </p>
-          <p className="text-indigo-300/80 italic">
-            * Ambas retenciones son computables a tu favor en la liquidación mensual de Ingresos Brutos e Impuesto a las Ganancias.
+        </div>
+      )}
+
+      {/* Explicación Egresos API / CBU Info Box */}
+      {showEgresosInfo && (
+        <div className="p-4 bg-rose-950/60 border border-rose-500/40 rounded-2xl text-rose-200 text-xs space-y-2 animate-in fade-in duration-200">
+          <div className="flex items-center justify-between font-bold text-sm text-rose-300">
+            <div className="flex items-center gap-2">
+              <Info className="w-4 h-4 text-rose-400" />
+              <span>¿Cómo mide Mercado Pago el Dinero Egresado?</span>
+            </div>
+            <button
+              onClick={() => setShowEgresosInfo(false)}
+              className="text-rose-400 hover:text-white text-xs font-semibold"
+            >
+              Cerrar ✕
+            </button>
+          </div>
+          <p>
+            • <strong>API de Cobros y Checkouts ($1.216.666)</strong>: Devuelve automáticamente las transferencias enviadas vía API checkout en el período (4 transferencias registradas en septiembre).
+          </p>
+          <p>
+            • <strong>Transferencias bancarias a CBU / CVU desde la App Móvil MP</strong>: Por políticas de seguridad financiera de Mercado Pago (`403 UNAUTHORIZED`), la API pública no entrega automáticamente las transferencias bancarias de salida iniciadas manualmente desde la aplicación móvil.
+          </p>
+          <p className="text-rose-300/90 font-semibold">
+            👉 Puedes usar el campo "Egresos CBU / Pagos App" en la tarjeta para sumar los egresos bancarios salientes del período.
           </p>
         </div>
       )}
@@ -250,7 +301,7 @@ export default function MercadoPagoReconciliationView({
           </div>
         </div>
 
-        {/* TARJETA 3: DESGLOSE POR MÉTODO DE PAGO (SIN PUNTOS SUSPENSIVOS) */}
+        {/* TARJETA 3: DESGLOSE POR MÉTODO DE PAGO */}
         <div className="bg-slate-900 rounded-2xl p-4 border border-slate-800 shadow-xl flex flex-col justify-between">
           <div className="flex items-center justify-between text-indigo-400 text-xs font-semibold uppercase tracking-wider mb-2">
             <span>Métodos de Pago</span>
@@ -276,7 +327,7 @@ export default function MercadoPagoReconciliationView({
           </div>
         </div>
 
-        {/* TARJETA 4: COMISIONES E IMPUESTOS (CON EXPLICACIÓN SIRTAC) */}
+        {/* TARJETA 4: COMISIONES E IMPUESTOS */}
         <div className="bg-slate-900 rounded-2xl p-4 border border-slate-800 shadow-xl flex flex-col justify-between">
           <div className="flex items-center justify-between text-amber-400 text-xs font-semibold uppercase tracking-wider mb-2">
             <span className="flex items-center gap-1">
@@ -311,24 +362,70 @@ export default function MercadoPagoReconciliationView({
           </div>
         </div>
 
-        {/* TARJETA 5: DINERO EGRESADO Y CONCEPTOS */}
-        <div className="bg-slate-900 rounded-2xl p-4 border border-slate-800 shadow-xl flex flex-col justify-between">
-          <div className="flex items-center justify-between text-rose-400 text-xs font-semibold uppercase tracking-wider mb-2">
-            <span>Dinero Egresado</span>
+        {/* TARJETA 5: DINERO EGRESADO Y CONCEPTOS (Desglose API + CBU Configurable) */}
+        <div className="bg-slate-900 rounded-2xl p-4 border border-rose-500/40 shadow-xl flex flex-col justify-between">
+          <div className="flex items-center justify-between text-rose-400 text-xs font-semibold uppercase tracking-wider mb-1">
+            <span className="flex items-center gap-1">
+              Dinero Egresado
+              <button
+                onClick={() => setShowEgresosInfo(!showEgresosInfo)}
+                className="text-rose-400 hover:text-white transition-colors ml-1"
+                title="Ver detalles de la API MP"
+              >
+                <Info className="w-3.5 h-3.5" />
+              </button>
+            </span>
             <ArrowDownLeft className="w-5 h-5 text-rose-400" />
           </div>
+
           <div>
-            <div className="text-2xl font-bold text-rose-400">
-              -${(kpis.mpEgresosTotal || 0).toLocaleString('es-AR')}
+            <div className="text-2xl font-black text-rose-400">
+              -${totalConsolidatedEgresos.toLocaleString('es-AR')}
             </div>
-            <div className="text-xs text-slate-400 mt-1">
-              {kpis.mpEgresosCount || 0} transferencias salientes en el período
+            
+            <div className="mt-1 space-y-1 text-[11px]">
+              <div className="flex justify-between text-slate-400">
+                <span>Vía API MP:</span>
+                <span className="font-semibold text-rose-300">-${apiEgresos.toLocaleString('es-AR')}</span>
+              </div>
+
+              <div className="flex justify-between items-center text-slate-400">
+                <span className="flex items-center gap-1">
+                  CBU / App MP:
+                  <button
+                    onClick={() => setIsEditingManualEgresos(!isEditingManualEgresos)}
+                    className="text-blue-400 hover:text-blue-300"
+                    title="Editar egresos manuales de la app"
+                  >
+                    <Edit2 className="w-3 h-3" />
+                  </button>
+                </span>
+                {isEditingManualEgresos ? (
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      value={tempManualInput}
+                      onChange={(e) => setTempManualInput(e.target.value)}
+                      className="w-20 bg-slate-950 border border-slate-700 rounded px-1.5 py-0.5 text-xs text-white"
+                    />
+                    <button
+                      onClick={saveManualEgresos}
+                      className="p-1 bg-blue-600 text-white rounded hover:bg-blue-500"
+                    >
+                      <Check className="w-3 h-3" />
+                    </button>
+                  </div>
+                ) : (
+                  <span className="font-semibold text-amber-400">
+                    -${manualEgresos.toLocaleString('es-AR')}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
-          <div className="mt-3 pt-2 border-t border-slate-800 text-[10px] text-slate-400">
-            {egresosConcepts.length > 0
-              ? egresosConcepts.map((c: any) => `${c.concept}: $${c.amount.toLocaleString('es-AR')}`).join(', ')
-              : 'Sin transferencias salientes en la fecha'}
+
+          <div className="mt-2 pt-2 border-t border-slate-800 text-[10px] text-slate-400 truncate">
+            {kpis.mpEgresosCount || 0} transferencias API + CBU App
           </div>
         </div>
 
