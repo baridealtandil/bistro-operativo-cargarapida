@@ -71,7 +71,7 @@ export async function POST(request: Request) {
       email: meData.email || 'mpagocantina@gmail.com',
     };
 
-    // 2. Fetch Mercado Pago Payments (search by range)
+    // 2. Fetch Mercado Pago Payments (search by range including all operation types)
     let mpPayments: any[] = [];
     let offset = 0;
     const limit = 100;
@@ -98,13 +98,29 @@ export async function POST(request: Request) {
       }
     }
 
-    // Process approved MP payments
-    const parsedMpPayments = mpPayments
+    // Parse Mercado Pago Payments into Incomes and Egresos
+    const parsedIncomes: any[] = [];
+    const parsedEgresos: any[] = [];
+
+    const paymentMethodsSummary: Record<string, { label: string; count: number; gross: number; net: number }> = {
+      debit: { label: 'Tarjeta de Débito', count: 0, gross: 0, net: 0 },
+      credit: { label: 'Tarjeta de Crédito', count: 0, gross: 0, net: 0 },
+      qr: { label: 'QR Presencial / MODO', count: 0, gross: 0, net: 0 },
+      account_money: { label: 'Dinero en Cuenta / Transferencia', count: 0, gross: 0, net: 0 },
+    };
+
+    const egresosConceptsSummary: Record<string, { concept: string; count: number; amount: number }> = {};
+
+    let totalSirtacTax = 0;
+    let totalDebitCreditTax = 0;
+    let totalOtherTax = 0;
+
+    mpPayments
       .filter((p: any) => p.status === 'approved')
-      .map((p: any) => {
+      .forEach((p: any) => {
         const gross = Number(p.transaction_amount || 0);
         const net = Number(p.transaction_details?.net_received_amount || gross);
-        
+
         let mpFee = 0;
         (p.fee_details || []).forEach((f: any) => {
           mpFee += Number(f.amount || 0);
@@ -113,7 +129,16 @@ export async function POST(request: Request) {
         let taxes = 0;
         (p.charges_details || []).forEach((c: any) => {
           if (c.type === 'tax') {
-            taxes += Number(c.amounts?.original || 0);
+            const taxAmt = Number(c.amounts?.original || 0);
+            taxes += taxAmt;
+
+            if (c.name?.includes('sirtac')) {
+              totalSirtacTax += taxAmt;
+            } else if (c.name?.includes('debitos_creditos')) {
+              totalDebitCreditTax += taxAmt;
+            } else {
+              totalOtherTax += taxAmt;
+            }
           }
         });
 
@@ -122,10 +147,16 @@ export async function POST(request: Request) {
 
         const posModel = p.point_of_interaction?.device?.model || '';
         const paymentType = p.payment_type_id || p.payment_method_id || 'QR/Digital';
-        const deviceLabel = posModel ? `Point ${posModel}` : (p.point_of_interaction?.type === 'INSTORE' ? 'QR Presencial' : paymentType);
+        const walletName = p.point_of_interaction?.transaction_data?.bank_info?.payer?.long_name || '';
+        const deviceLabel = posModel
+          ? `Point ${posModel}`
+          : (walletName ? `QR ${walletName}` : (p.point_of_interaction?.type === 'INSTORE' ? 'QR Presencial' : paymentType));
 
-        return {
+        const isMoneyTransferOut = p.operation_type === 'money_transfer' && p.collector_id === undefined;
+
+        const parsedItem = {
           id: String(p.id),
+          operationType: p.operation_type || 'regular_payment',
           dateCreated: createdIso,
           dateStr,
           hour: artHour,
@@ -135,11 +166,43 @@ export async function POST(request: Request) {
           feeAmount: Math.round(mpFee * 100) / 100,
           taxAmount: Math.round(taxes * 100) / 100,
           paymentMethod: p.payment_method_id || 'digital',
+          paymentTypeId: p.payment_type_id || '',
           deviceLabel,
-          description: p.description || 'Cobro Cantina Pink',
+          description: p.description || (isMoneyTransferOut ? 'Transferencia Saliente / Egreso' : 'Cobro Cantina Pink'),
           payerId: p.payer?.id || '',
-          orderId: p.order?.id || '',
+          payerName: p.card?.cardholder?.name || p.payer?.email || '',
         };
+
+        if (isMoneyTransferOut) {
+          parsedEgresos.push(parsedItem);
+          const concept = p.description || 'Transferencia Saliente / Retiro';
+          if (!egresosConceptsSummary[concept]) {
+            egresosConceptsSummary[concept] = { concept, count: 0, amount: 0 };
+          }
+          egresosConceptsSummary[concept].count += 1;
+          egresosConceptsSummary[concept].amount += gross;
+        } else {
+          parsedIncomes.push(parsedItem);
+
+          // Categorize payment method
+          if (p.payment_type_id === 'debit_card' || p.payment_method_id?.includes('deb')) {
+            paymentMethodsSummary.debit.count += 1;
+            paymentMethodsSummary.debit.gross += gross;
+            paymentMethodsSummary.debit.net += net;
+          } else if (p.payment_type_id === 'credit_card') {
+            paymentMethodsSummary.credit.count += 1;
+            paymentMethodsSummary.credit.gross += gross;
+            paymentMethodsSummary.credit.net += net;
+          } else if (p.payment_type_id === 'account_money' || p.payment_method_id === 'account_money') {
+            paymentMethodsSummary.account_money.count += 1;
+            paymentMethodsSummary.account_money.gross += gross;
+            paymentMethodsSummary.account_money.net += net;
+          } else {
+            paymentMethodsSummary.qr.count += 1;
+            paymentMethodsSummary.qr.gross += gross;
+            paymentMethodsSummary.qr.net += net;
+          }
+        }
       });
 
     // 3. Fetch Fudo Sales for the period to reconcile
@@ -184,13 +247,12 @@ export async function POST(request: Request) {
       }
     }
 
-    // 4. Perform Reconciliation matching Fudo vs Mercado Pago
+    // 4. Perform Reconciliation matching Fudo vs Mercado Pago Incomes
     const mpUsedIds = new Set<string>();
     const reconciliationRows: any[] = [];
 
     fudoDigitalSales.forEach(fudoSale => {
-      // Find matching MP payment by amount and timestamp (within same date & shift or +/- 45 mins)
-      const match = parsedMpPayments.find(mp => {
+      const match = parsedIncomes.find(mp => {
         if (mpUsedIds.has(mp.id)) return false;
         if (Math.abs(mp.grossAmount - fudoSale.total) < 1) {
           if (mp.dateStr === fudoSale.dateStr) return true;
@@ -213,6 +275,7 @@ export async function POST(request: Request) {
           mpTax: match.taxAmount,
           mpDevice: match.deviceLabel,
           mpDate: match.dateStr,
+          mpDescription: match.description,
         });
       } else {
         reconciliationRows.push({
@@ -228,12 +291,13 @@ export async function POST(request: Request) {
           mpTax: 0,
           mpDevice: 'N/A',
           mpDate: 'N/A',
+          mpDescription: 'Sin cobro coincidente en MP',
         });
       }
     });
 
-    // Add remaining unmatched MP payments
-    parsedMpPayments.forEach(mp => {
+    // Add remaining unmatched MP Incomes
+    parsedIncomes.forEach(mp => {
       if (!mpUsedIds.has(mp.id)) {
         reconciliationRows.push({
           status: 'UNMATCHED_MP',
@@ -248,15 +312,38 @@ export async function POST(request: Request) {
           mpTax: mp.taxAmount,
           mpDevice: mp.deviceLabel,
           mpDate: mp.dateStr,
+          mpDescription: mp.description,
         });
       }
     });
 
+    // Add Egresos as separate rows in reconciliation table
+    parsedEgresos.forEach(eg => {
+      reconciliationRows.push({
+        status: 'EGRESO_MP',
+        fudoSaleId: null,
+        fudoTotal: 0,
+        fudoShift: eg.shift,
+        fudoDate: eg.dateStr,
+        mpPaymentId: eg.id,
+        mpGross: eg.grossAmount,
+        mpNet: eg.grossAmount,
+        mpFee: eg.feeAmount,
+        mpTax: eg.taxAmount,
+        mpDevice: 'Transferencia Saliente',
+        mpDate: eg.dateStr,
+        mpDescription: eg.description,
+      });
+    });
+
     // Calculate overall KPIs
-    const mpGrossTotal = parsedMpPayments.reduce((acc, p) => acc + p.grossAmount, 0);
-    const mpNetTotal = parsedMpPayments.reduce((acc, p) => acc + p.netAmount, 0);
-    const mpFeesTotal = parsedMpPayments.reduce((acc, p) => acc + p.feeAmount, 0);
-    const mpTaxesTotal = parsedMpPayments.reduce((acc, p) => acc + p.taxAmount, 0);
+    const mpGrossTotal = parsedIncomes.reduce((acc, p) => acc + p.grossAmount, 0);
+    const mpNetTotal = parsedIncomes.reduce((acc, p) => acc + p.netAmount, 0);
+    const mpFeesTotal = parsedIncomes.reduce((acc, p) => acc + p.feeAmount, 0);
+    const mpTaxesTotal = parsedIncomes.reduce((acc, p) => acc + p.taxAmount, 0);
+    const mpEgresosTotal = parsedEgresos.reduce((acc, p) => acc + p.grossAmount, 0);
+
+    const calculatedBalanceInAccount = Math.max(0, Math.round(mpNetTotal - mpEgresosTotal));
 
     const reconciledCount = reconciliationRows.filter(r => r.status === 'RECONCILED').length;
     const totalFudoCount = fudoDigitalSales.length;
@@ -268,25 +355,32 @@ export async function POST(request: Request) {
       endDate,
       accountInfo,
       kpis: {
+        calculatedBalanceInAccount,
         mpGrossTotal,
         mpNetTotal,
         mpFeesTotal,
         mpTaxesTotal,
-        mpPaymentsCount: parsedMpPayments.length,
+        mpEgresosTotal,
+        totalSirtacTax: Math.round(totalSirtacTax * 100) / 100,
+        totalDebitCreditTax: Math.round(totalDebitCreditTax * 100) / 100,
+        totalOtherTax: Math.round(totalOtherTax * 100) / 100,
+        mpPaymentsCount: parsedIncomes.length,
+        mpEgresosCount: parsedEgresos.length,
         fudoSalesCount: totalFudoCount,
         reconciledCount,
-        unmatchedFudoCount: reconciliationRows.filter(r => r.status === 'UNMATCHED_FUDO').length,
-        unmatchedMpCount: reconciliationRows.filter(r => r.status === 'UNMATCHED_MP').length,
         reconciliationPercentage,
       },
+      paymentMethodsSummary,
+      egresosConceptsSummary: Object.values(egresosConceptsSummary),
       reconciliationRows,
-      mpPayments: parsedMpPayments,
+      incomes: parsedIncomes,
+      egresos: parsedEgresos,
     });
   } catch (error: any) {
     console.error('Error in Mercado Pago reconcile API:', error);
     return NextResponse.json({
       success: false,
-      error: error.message || 'Error al procesar la conciliación de Mercado Pago',
+      error: error.message || 'Error al procesar los movimientos de Mercado Pago',
     }, { status: 500 });
   }
 }
