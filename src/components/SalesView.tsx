@@ -2,13 +2,13 @@
 
 import React, { useState } from 'react';
 import { useGastronomy, classifyPaymentMethod } from '../context/GastronomyContext';
-import { Plus, Sun, Moon, Users, DollarSign, Calendar, Filter, RefreshCw, Wallet, CreditCard, Landmark, ArrowDownCircle, Edit2, ShieldCheck, UtensilsCrossed } from 'lucide-react';
+import { Plus, Sun, Moon, Users, DollarSign, Calendar, Filter, RefreshCw, Wallet, CreditCard, Landmark, ArrowDownCircle, Edit2, ShieldCheck, UtensilsCrossed, Trash2 } from 'lucide-react';
 import { Sale } from '../types/gastronomy';
 import { DateRangePicker } from './DateRangePicker';
 import { FudoSyncModal } from './FudoSyncModal';
 
 export const SalesView: React.FC = () => {
-  const { sales, addSale, editSale, expenses, role, cajaMayorBalance, mercadoPagoBalance } = useGastronomy();
+  const { sales, addSale, editSale, deleteSale, expenses, role, cajaMayorBalance, mercadoPagoBalance } = useGastronomy();
   const [showModal, setShowModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showFudoModal, setShowFudoModal] = useState(false);
@@ -403,7 +403,32 @@ export const SalesView: React.FC = () => {
       <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
         <div className="p-4 border-b border-slate-800 flex items-center justify-between">
           <h3 className="text-sm font-bold text-white">Histórico de Ventas del Período Seleccionado</h3>
-          <span className="text-xs text-slate-400">{filteredSales.length} cierres listados</span>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-slate-400">{filteredSales.length} cierres listados</span>
+            {sales.some((s, idx) => sales.findIndex(o => o.date === s.date && o.shift === s.shift && o.grossAmount === s.grossAmount) !== idx) && (
+              <button
+                onClick={() => {
+                  const seen = new Set<string>();
+                  const toDelete: string[] = [];
+                  sales.forEach(s => {
+                    const key = `${s.date}_${s.shift}_${s.grossAmount}`;
+                    if (seen.has(key)) {
+                      toDelete.push(s.id);
+                    } else {
+                      seen.add(key);
+                    }
+                  });
+                  toDelete.forEach(id => deleteSale(id));
+                  alert(`Se limpiaron ${toDelete.length} registros duplicados.`);
+                }}
+                className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 text-[10px] font-bold rounded-lg transition-all flex items-center gap-1"
+                title="Detectar y eliminar registros de ventas duplicados"
+              >
+                <Trash2 className="w-3 h-3 text-rose-400" />
+                <span>Limpiar Duplicados</span>
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="overflow-x-auto">
@@ -460,13 +485,24 @@ export const SalesView: React.FC = () => {
                           )}
                         </div>
                       </td>
-                      <td className="p-3 text-right">
+                      <td className="p-3 text-right flex items-center justify-end gap-1">
                         <button
                           onClick={() => handleStartEdit(s)}
                           className="p-1.5 text-slate-400 hover:text-amber-400 hover:bg-slate-800 rounded-lg transition-all"
                           title="Modificar venta registrada"
                         >
                           <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (confirm(`¿Eliminar la venta registrada del ${s.date} por $${s.netAmount.toLocaleString('es-AR')}?`)) {
+                              deleteSale(s.id);
+                            }
+                          }}
+                          className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-lg transition-all"
+                          title="Eliminar este cierre de venta"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </td>
                     </tr>

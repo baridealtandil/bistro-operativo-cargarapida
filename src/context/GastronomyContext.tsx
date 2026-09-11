@@ -102,6 +102,7 @@ interface GastronomyContextType {
   sales: Sale[];
   addSale: (sale: Omit<Sale, 'id' | 'netAmount'>) => void;
   editSale: (id: string, saleData: Partial<Sale>) => void;
+  deleteSale: (id: string) => void;
   suppliers: Supplier[];
   addSupplier: (supplier: Omit<Supplier, 'id' | 'balanceDue'>) => void;
   editSupplier: (id: string, supplierData: Partial<Supplier>) => void;
@@ -390,13 +391,44 @@ export const GastronomyProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const addSale = (saleData: Omit<Sale, 'id' | 'netAmount'>) => {
     const netAmount = saleData.grossAmount - saleData.commissionAmount;
-    const newSale: Sale = { ...saleData, id: `s_${Date.now()}`, netAmount };
+    let saleToRegister: Sale | undefined;
+
     setSales(prev => {
-      const updated = [newSale, ...prev];
+      // Si es una importación desde Fudo, actualizar el registro existente si coincide fecha y turno
+      const isFudoImport = saleData.notes?.includes('Fudo POS');
+      if (isFudoImport) {
+        const existingIdx = prev.findIndex(
+          s => s.date === saleData.date && s.shift === saleData.shift && s.notes?.includes('Fudo POS')
+        );
+        if (existingIdx >= 0) {
+          const existingId = prev[existingIdx].id;
+          removeCashMovementsBySource('VENTA', existingId);
+          saleToRegister = { ...saleData, id: existingId, netAmount };
+          const updated = [...prev];
+          updated[existingIdx] = saleToRegister;
+          try { localStorage.setItem('gastro_sales', JSON.stringify(updated)); } catch (e) {}
+          return updated;
+        }
+      }
+
+      saleToRegister = { ...saleData, id: `s_${Date.now()}`, netAmount };
+      const updated = [saleToRegister, ...prev];
       try { localStorage.setItem('gastro_sales', JSON.stringify(updated)); } catch (e) {}
       return updated;
     });
-    registerSaleCashMovement(newSale);
+
+    if (saleToRegister) {
+      registerSaleCashMovement(saleToRegister);
+    }
+  };
+
+  const deleteSale = (id: string) => {
+    setSales(prev => {
+      const updated = prev.filter(s => s.id !== id);
+      try { localStorage.setItem('gastro_sales', JSON.stringify(updated)); } catch (e) {}
+      return updated;
+    });
+    removeCashMovementsBySource('VENTA', id);
   };
 
   const editSale = (id: string, saleData: Partial<Sale>) => {
@@ -1392,6 +1424,7 @@ export const GastronomyProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         sales,
         addSale,
         editSale,
+        deleteSale,
         suppliers,
         addSupplier,
         editSupplier,
