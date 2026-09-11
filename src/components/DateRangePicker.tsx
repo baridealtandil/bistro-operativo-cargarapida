@@ -52,9 +52,18 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
   const formatDisplay = (dateStr: string) => {
     if (!dateStr) return '';
     const parts = dateStr.split('-');
-    if (parts.length !== 3) return dateStr;
-    const [y, m, d] = parts;
-    return `${d}/${m}/${y}`;
+    if (parts.length === 3) {
+      const [y, m, d] = parts;
+      const yy = y.length === 4 ? y.slice(2) : y;
+      return `${d}/${m}/${yy}`;
+    }
+    const slashParts = dateStr.split('/');
+    if (slashParts.length === 3) {
+      const [d, m, y] = slashParts;
+      const yy = y.length === 4 ? y.slice(2) : y;
+      return `${d}/${m}/${yy}`;
+    }
+    return dateStr;
   };
 
   const handlePrevMonth = () => {
@@ -147,7 +156,7 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
 
   return (
     <div className={`relative inline-block ${className}`} ref={containerRef}>
-      {/* Clean Trigger Button */}
+      {/* Clean Trigger Button in DD/MM/YY */}
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
@@ -167,7 +176,7 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
         </span>
       </button>
 
-      {/* Popover Calendar Modal - Clean Positioning Below Trigger */}
+      {/* Popover Calendar Modal */}
       {isOpen && (
         <div className="absolute right-0 sm:left-0 top-full mt-2.5 bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl z-50 p-4 w-80 sm:w-96 text-slate-100 ring-1 ring-slate-800">
           {/* Header */}

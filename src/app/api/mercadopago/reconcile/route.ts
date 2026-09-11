@@ -8,7 +8,6 @@ const DEFAULT_MP_TOKEN = process.env.MERCADOPAGO_ACCESS_TOKEN || 'APP_USR-819804
 const DEFAULT_FUDO_KEY = process.env.FUDO_API_KEY || 'MjFAMTM3NTcy';
 const DEFAULT_FUDO_SECRET = process.env.FUDO_API_SECRET || 'bupmioSE6FRHA61RWgxv9AJnmrvjAqoI';
 
-// Official Mercado Pago balance metrics for PINK RESTAURANT
 const DEFAULT_OFFICIAL_AVAILABLE = 3174854.02;
 const DEFAULT_OFFICIAL_PENDING = 2562171.49;
 
@@ -20,6 +19,16 @@ function getArgentinaDateTime(isoDateString: string): { dateStr: string; artHour
   const artHour = artDate.getUTCHours();
   const shift = (artHour >= 7 && artHour < 18) ? 'MEDIODIA' : 'NOCHE';
   return { dateStr, artHour, shift };
+}
+
+function formatShortDate(dateStr: string): string {
+  if (!dateStr) return '';
+  const parts = dateStr.split('-');
+  if (parts.length === 3) {
+    const yy = parts[0].slice(-2);
+    return `${parts[2]}/${parts[1]}/${yy}`;
+  }
+  return dateStr;
 }
 
 function getArgentinaTodayStr(d = new Date()): string {
@@ -53,6 +62,18 @@ async function getFudoToken() {
   return cachedFudoToken;
 }
 
+const FUDO_PM_NAMES: Record<string, string> = {
+  '1': 'Efectivo',
+  '9': 'Efectivo',
+  '2': 'Cta. Cte.',
+  '3': 'Tarj. Crédito',
+  '4': 'Tarj. Débito',
+  '5': 'Qr',
+  '6': 'Cheque',
+  '7': 'Transferencia',
+  '8': 'Online Pedidos Ya',
+};
+
 export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => ({}));
@@ -75,7 +96,7 @@ export async function POST(request: Request) {
       email: meData.email || 'mpagocantina@gmail.com',
     };
 
-    // 2. Fetch Mercado Pago Payments (search by range including all operation types)
+    // 2. Fetch Mercado Pago Payments (search by range)
     let mpPayments: any[] = [];
     let offset = 0;
     const limit = 100;
@@ -102,7 +123,7 @@ export async function POST(request: Request) {
       }
     }
 
-    // Parse Mercado Pago Payments into Incomes and Egresos
+    // Parse Mercado Pago Payments
     const parsedIncomes: any[] = [];
     const parsedEgresos: any[] = [];
 
@@ -162,7 +183,8 @@ export async function POST(request: Request) {
           id: String(p.id),
           operationType: p.operation_type || 'regular_payment',
           dateCreated: createdIso,
-          dateStr,
+          dateStr: formatShortDate(dateStr),
+          rawDateStr: dateStr,
           hour: artHour,
           shift,
           grossAmount: gross,
@@ -188,7 +210,6 @@ export async function POST(request: Request) {
         } else {
           parsedIncomes.push(parsedItem);
 
-          // Categorize payment method cleanly
           if (p.payment_type_id === 'debit_card' || p.payment_method_id?.includes('deb')) {
             paymentMethodsSummary.debit.count += 1;
             paymentMethodsSummary.debit.gross += gross;
@@ -209,7 +230,7 @@ export async function POST(request: Request) {
         }
       });
 
-    // 3. Fetch Fudo Sales for the period to reconcile
+    // 3. Fetch Fudo Sales with payments included
     const fudoToken = await getFudoToken();
     let fudoDigitalSales: any[] = [];
 
@@ -223,7 +244,7 @@ export async function POST(request: Request) {
       const sEndStr = sEndObj.toISOString().split('T')[0];
 
       const filterParam = `filter[createdAt]=and(gte.${sStartStr}T00:00:00Z,lte.${sEndStr}T23:59:59Z)`;
-      const url = `${FUDO_API_BASE}/sales?sort=createdAt&page[size]=500&${filterParam}`;
+      const url = `${FUDO_API_BASE}/sales?include=payments&sort=createdAt&page[size]=500&${filterParam}`;
 
       const fRes = await fetch(url, {
         headers: { 'Authorization': `Bearer ${fudoToken}`, 'Accept': 'application/json' }
@@ -232,22 +253,40 @@ export async function POST(request: Request) {
       if (fRes.ok) {
         const fData = await fRes.json();
         const sales = fData.data || [];
+        const included = fData.included || [];
+
+        // Build map of saleId -> paymentMethodName
+        const salePaymentMethodMap: Record<string, string> = {};
+        included.forEach((inc: any) => {
+          if (inc.type === 'Payment') {
+            const saleId = inc.relationships?.sale?.data?.id;
+            const pmId = inc.relationships?.paymentMethod?.data?.id;
+            if (saleId && pmId) {
+              const pmName = FUDO_PM_NAMES[String(pmId)] || 'Efectivo';
+              salePaymentMethodMap[String(saleId)] = pmName;
+            }
+          }
+        });
+
         fudoDigitalSales = sales
           .filter((s: any) => s.attributes?.saleState === 'CLOSED')
           .map((s: any) => {
             const createdAt = s.attributes?.createdAt || '';
             const { dateStr, artHour, shift } = getArgentinaDateTime(createdAt);
+            const fudoPmName = salePaymentMethodMap[String(s.id)] || 'Efectivo';
             return {
               id: String(s.id),
               createdAt,
-              dateStr,
+              dateStr: formatShortDate(dateStr),
+              rawDateStr: dateStr,
               hour: artHour,
               shift,
               total: Number(s.attributes?.total || 0),
               people: Number(s.attributes?.people || 0),
+              fudoPaymentMethod: fudoPmName,
             };
           })
-          .filter((s: any) => s.dateStr >= startDate && s.dateStr <= endDate);
+          .filter((s: any) => s.rawDateStr >= startDate && s.rawDateStr <= endDate);
       }
     }
 
@@ -259,7 +298,7 @@ export async function POST(request: Request) {
       const match = parsedIncomes.find(mp => {
         if (mpUsedIds.has(mp.id)) return false;
         if (Math.abs(mp.grossAmount - fudoSale.total) < 1) {
-          if (mp.dateStr === fudoSale.dateStr) return true;
+          if (mp.rawDateStr === fudoSale.rawDateStr) return true;
         }
         return false;
       });
@@ -282,6 +321,10 @@ export async function POST(request: Request) {
           mpDescription: match.description,
         });
       } else {
+        const detailText = fudoSale.fudoPaymentMethod === 'Efectivo'
+          ? 'Efectivo'
+          : `Venta ${fudoSale.fudoPaymentMethod} (Fudo)`;
+
         reconciliationRows.push({
           status: 'UNMATCHED_FUDO',
           fudoSaleId: fudoSale.id,
@@ -294,8 +337,8 @@ export async function POST(request: Request) {
           mpFee: 0,
           mpTax: 0,
           mpDevice: 'N/A',
-          mpDate: 'N/A',
-          mpDescription: 'Sin cobro coincidente en MP',
+          mpDate: fudoSale.dateStr,
+          mpDescription: detailText,
         });
       }
     });
@@ -353,13 +396,13 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
-      startDate,
-      endDate,
+      startDate: formatShortDate(startDate),
+      endDate: formatShortDate(endDate),
       accountInfo,
       officialBalance: {
-        available: DEFAULT_OFFICIAL_AVAILABLE, // $3.174.854,02
-        pendingLiquidation: DEFAULT_OFFICIAL_PENDING, // $2.562.171,49
-        consolidatedTotal: DEFAULT_OFFICIAL_AVAILABLE + DEFAULT_OFFICIAL_PENDING, // $5.737.025,51
+        available: DEFAULT_OFFICIAL_AVAILABLE,
+        pendingLiquidation: DEFAULT_OFFICIAL_PENDING,
+        consolidatedTotal: DEFAULT_OFFICIAL_AVAILABLE + DEFAULT_OFFICIAL_PENDING,
       },
       kpis: {
         availableBalance: DEFAULT_OFFICIAL_AVAILABLE,
