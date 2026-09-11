@@ -23,7 +23,8 @@ import {
   Filter,
   CheckCircle2,
   XCircle,
-  AlertCircle
+  AlertCircle,
+  PieChart
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -355,7 +356,9 @@ export const FudoLiveDashboard: React.FC = () => {
               <div className="text-2xl font-black text-sky-400">
                 {data.grandTotals.totalPeopleCount} pax
               </div>
-              <span className="text-[10px] text-slate-500 block">Promedio por pax: ${data.grandTotals.averageTicketPerCover.toLocaleString('es-AR')}</span>
+              <span className="text-[10px] text-slate-500 block">
+                Ticket promedio pax: ${data.grandTotals.totalPeopleCount > 0 ? Math.round(data.grandTotals.totalGrossAmount / data.grandTotals.totalPeopleCount).toLocaleString('es-AR') : 0}
+              </span>
             </div>
 
             <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl space-y-1">
@@ -363,7 +366,9 @@ export const FudoLiveDashboard: React.FC = () => {
               <div className="text-2xl font-black text-emerald-400">
                 ${data.grandTotals.totalCashAmount.toLocaleString('es-AR')}
               </div>
-              <span className="text-[10px] text-slate-500 block">Cobrado en papel</span>
+              <span className="text-[10px] text-slate-500 block">
+                {data.grandTotals.totalGrossAmount > 0 ? ((data.grandTotals.totalCashAmount / data.grandTotals.totalGrossAmount) * 100).toFixed(1) : 0}% de las ventas
+              </span>
             </div>
 
             <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl space-y-1">
@@ -371,9 +376,90 @@ export const FudoLiveDashboard: React.FC = () => {
               <div className="text-2xl font-black text-sky-400">
                 ${data.grandTotals.totalDigitalAmount.toLocaleString('es-AR')}
               </div>
-              <span className="text-[10px] text-slate-500 block">QR, Débito y Crédito</span>
+              <span className="text-[10px] text-slate-500 block">
+                {data.grandTotals.totalGrossAmount > 0 ? ((data.grandTotals.totalDigitalAmount / data.grandTotals.totalGrossAmount) * 100).toFixed(1) : 0}% de las ventas
+              </span>
             </div>
           </div>
+
+          {/* DESGLOSE 100% CANALES DE VENTA FUDO */}
+          {(() => {
+            const totalGross = data.grandTotals.totalGrossAmount || 0;
+            const cashAmt = data.grandTotals.totalCashAmount || 0;
+            const digitalAmt = data.grandTotals.totalDigitalAmount || 0;
+            const otherAmt = Math.max(0, totalGross - (cashAmt + digitalAmt));
+
+            const cashPct = totalGross > 0 ? ((cashAmt / totalGross) * 100).toFixed(1) : '0.0';
+            const digitalPct = totalGross > 0 ? ((digitalAmt / totalGross) * 100).toFixed(1) : '0.0';
+            const otherPct = totalGross > 0 ? ((otherAmt / totalGross) * 100).toFixed(1) : '0.0';
+
+            return (
+              <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl space-y-4 shadow-xl">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <PieChart className="w-5 h-5 text-amber-400" />
+                    <h3 className="text-base font-bold text-white">Conciliación 100% Canales de Venta (Período Seleccionado)</h3>
+                  </div>
+                  <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-bold px-3 py-1 rounded-full self-start sm:self-auto">
+                    Suma Canales = 100% de Ventas Fudo
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {/* Total Ventas */}
+                  <div className="bg-slate-950 p-4 rounded-xl border border-amber-500/30">
+                    <div className="text-slate-400 text-xs font-medium">TOTAL VENTAS FUDO</div>
+                    <div className="text-2xl font-black text-amber-400 mt-1">
+                      ${totalGross.toLocaleString('es-AR')}
+                    </div>
+                    <div className="text-xs text-amber-300/80 font-bold mt-1">100% del Facturado</div>
+                  </div>
+
+                  {/* Ventas en Efectivo */}
+                  <div className="bg-slate-950 p-4 rounded-xl border border-emerald-500/30">
+                    <div className="text-slate-400 text-xs font-medium">💵 VENTAS EN EFECTIVO</div>
+                    <div className="text-2xl font-black text-emerald-400 mt-1">
+                      ${cashAmt.toLocaleString('es-AR')}
+                    </div>
+                    <div className="text-xs text-emerald-300/80 font-bold mt-1">{cashPct}% de las Ventas</div>
+                  </div>
+
+                  {/* Ventas en Mercado Pago */}
+                  <div className="bg-slate-950 p-4 rounded-xl border border-sky-500/30">
+                    <div className="text-slate-400 text-xs font-medium">💳 VENTAS EN MERCADO PAGO</div>
+                    <div className="text-2xl font-black text-sky-400 mt-1">
+                      ${digitalAmt.toLocaleString('es-AR')}
+                    </div>
+                    <div className="text-xs text-sky-300/80 font-bold mt-1">{digitalPct}% de las Ventas</div>
+                  </div>
+
+                  {/* Otros Medios */}
+                  <div className="bg-slate-950 p-4 rounded-xl border border-indigo-500/30">
+                    <div className="text-slate-400 text-xs font-medium">🏦 OTROS MEDIOS (Cta Cte/Transf)</div>
+                    <div className="text-2xl font-black text-indigo-400 mt-1">
+                      ${otherAmt.toLocaleString('es-AR')}
+                    </div>
+                    <div className="text-xs text-indigo-300/80 font-bold mt-1">{otherPct}% de las Ventas</div>
+                  </div>
+                </div>
+
+                {/* Progress Bar Distribution */}
+                <div className="space-y-1.5 pt-2">
+                  <div className="flex flex-col sm:flex-row justify-between text-xs text-slate-400 font-medium gap-1">
+                    <span>Distribución Proporcional de Canales</span>
+                    <span className="font-semibold text-slate-200">
+                      💵 Efectivo {cashPct}% | 💳 MP {digitalPct}% | 🏦 Otros {otherPct}%
+                    </span>
+                  </div>
+                  <div className="h-3.5 w-full bg-slate-950 rounded-full overflow-hidden flex border border-slate-800">
+                    <div style={{ width: `${cashPct}%` }} className="bg-emerald-500 h-full" title={`Efectivo: ${cashPct}%`} />
+                    <div style={{ width: `${digitalPct}%` }} className="bg-sky-500 h-full" title={`Mercado Pago: ${digitalPct}%`} />
+                    <div style={{ width: `${otherPct}%` }} className="bg-indigo-500 h-full" title={`Otros: ${otherPct}%`} />
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* GRÁFICO EVOLUTIVO DE VENTAS BRUTAS */}
           <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-4 shadow-xl">

@@ -136,15 +136,15 @@ export async function POST(request: Request) {
       email: meData.email || 'mpagocantina@gmail.com',
     };
 
-    // 2. Fetch Mercado Pago Payments (search by range)
-    let mpPayments: any[] = [];
-    let offset = 0;
+    // 2. Fetch Mercado Pago Payments (Dual search: Collector + Payer)
+    const paymentsMap = new Map<string, any>();
     const limit = 100;
-    let hasMoreMP = true;
-
     const beginDateIso = `${startDate}T00:00:00.000-03:00`;
     const endDateIso = `${endDate}T23:59:59.999-03:00`;
 
+    // Query 1: Collector Payments (Incomes)
+    let offset = 0;
+    let hasMoreMP = true;
     while (hasMoreMP && offset < 500) {
       const searchUrl = `${MP_BASE}/v1/payments/search?sort=date_created&criteria=desc&begin_date=${beginDateIso}&end_date=${endDateIso}&limit=${limit}&offset=${offset}`;
       const mpRes = await fetch(searchUrl, {
@@ -154,14 +154,31 @@ export async function POST(request: Request) {
       if (!mpRes.ok) break;
       const mpData = await mpRes.json();
       const results = mpData.results || [];
-      mpPayments = mpPayments.concat(results);
+      results.forEach((p: any) => paymentsMap.set(String(p.id), p));
 
-      if (results.length < limit) {
-        hasMoreMP = false;
-      } else {
-        offset += limit;
-      }
+      if (results.length < limit) hasMoreMP = false;
+      else offset += limit;
     }
+
+    // Query 2: Payer Payments (Egresos: Personal, Sueldos, Suscripciones, Transferencias)
+    offset = 0;
+    hasMoreMP = true;
+    while (hasMoreMP && offset < 500) {
+      const searchUrl = `${MP_BASE}/v1/payments/search?sort=date_created&criteria=desc&begin_date=${beginDateIso}&end_date=${endDateIso}&limit=${limit}&offset=${offset}&payer.id=836632087`;
+      const mpRes = await fetch(searchUrl, {
+        headers: { 'Authorization': `Bearer ${mpToken}` }
+      });
+
+      if (!mpRes.ok) break;
+      const mpData = await mpRes.json();
+      const results = mpData.results || [];
+      results.forEach((p: any) => paymentsMap.set(String(p.id), p));
+
+      if (results.length < limit) hasMoreMP = false;
+      else offset += limit;
+    }
+
+    const allMpPayments = Array.from(paymentsMap.values());
 
     // Parse Mercado Pago Payments
     const parsedIncomes: any[] = [];
@@ -180,7 +197,7 @@ export async function POST(request: Request) {
     let totalDebitCreditTax = 0;
     let totalOtherTax = 0;
 
-    mpPayments
+    allMpPayments
       .filter((p: any) => p.status === 'approved')
       .forEach((p: any) => {
         const gross = Number(p.transaction_amount || 0);
@@ -217,7 +234,11 @@ export async function POST(request: Request) {
           ? `Point ${posModel}`
           : (walletName ? `QR ${walletName}` : (p.point_of_interaction?.type === 'INSTORE' ? 'QR Presencial' : paymentType));
 
-        const isMoneyTransferOut = p.operation_type === 'money_transfer' && p.collector_id === undefined;
+        const isPayer = String(p.payer?.id) === '836632087';
+        const isMoneyTransfer = p.operation_type === 'money_transfer';
+        const isSoftwareOrPersonal = p.description?.includes('Personal') || p.description?.includes('Fudo') || p.description?.includes('Abono');
+
+        const isEgreso = (isPayer && p.collector_id !== 836632087) || (isMoneyTransfer && p.collector_id === undefined) || isSoftwareOrPersonal;
 
         const parsedItem = {
           id: String(p.id),
@@ -234,12 +255,12 @@ export async function POST(request: Request) {
           paymentMethod: p.payment_method_id || 'digital',
           paymentTypeId: p.payment_type_id || '',
           deviceLabel,
-          description: p.description || (isMoneyTransferOut ? 'Transferencia Saliente' : 'Cobro Cantina Pink'),
+          description: p.description || (isEgreso ? 'Transferencia Saliente / Egreso' : 'Cobro Cantina Pink'),
           payerId: p.payer?.id || '',
           payerName: p.card?.cardholder?.name || p.payer?.email || '',
         };
 
-        if (isMoneyTransferOut) {
+        if (isEgreso) {
           parsedEgresos.push(parsedItem);
           const concept = p.description || 'Transferencia Saliente';
           if (!egresosConceptsSummary[concept]) {
