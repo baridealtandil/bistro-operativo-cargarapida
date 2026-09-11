@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { getStatementEgresosForRange } from '@/utils/mpStatementData';
 
 const MP_BASE = 'https://api.mercadopago.com';
 const FUDO_AUTH_URL = 'https://auth.fu.do/api';
@@ -290,6 +291,43 @@ export async function POST(request: Request) {
           }
         }
       });
+
+    // Merge Official Statement Egresos (CBU / Mobile App bank transfers from official MP statement)
+    const statementEgresos = getStatementEgresosForRange(startDate, endDate);
+    const existingEgresoIds = new Set(parsedEgresos.map(e => e.id));
+
+    statementEgresos.forEach(st => {
+      if (!existingEgresoIds.has(st.id)) {
+        existingEgresoIds.add(st.id);
+        const parsedItem = {
+          id: st.id,
+          operationType: 'bank_transfer',
+          dateCreated: `${st.rawDateStr}T12:00:00.000-03:00`,
+          dateStr: st.dateStr,
+          rawDateStr: st.rawDateStr,
+          hour: 12,
+          shift: 'MEDIODIA',
+          grossAmount: st.amount,
+          netAmount: st.amount,
+          feeAmount: 0,
+          taxAmount: 0,
+          paymentMethod: 'cbu_transfer',
+          paymentTypeId: 'bank_transfer',
+          deviceLabel: 'Resumen CBU / App MP',
+          description: st.concept,
+          payerId: '836632087',
+          payerName: 'PINK RESTAURANT Y PIZZERIA DE TANDIL SA',
+        };
+        parsedEgresos.push(parsedItem);
+
+        const concept = st.concept;
+        if (!egresosConceptsSummary[concept]) {
+          egresosConceptsSummary[concept] = { concept, count: 0, amount: 0 };
+        }
+        egresosConceptsSummary[concept].count += 1;
+        egresosConceptsSummary[concept].amount += st.amount;
+      }
+    });
 
     // 3. Fetch Fudo Sales with payments included
     const fudoToken = await getFudoToken();
