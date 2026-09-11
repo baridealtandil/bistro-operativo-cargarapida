@@ -15,13 +15,15 @@ import {
   Webhook,
   Handshake,
   Lock,
-  Target
+  Target,
+  CreditCard
 } from 'lucide-react';
 import { useGastronomy } from '../context/GastronomyContext';
 
 export type TabType =
   | 'dashboard'
   | 'fudo'
+  | 'mercadopago'
   | 'ventas'
   | 'compras'
   | 'gastos'
@@ -42,6 +44,7 @@ interface NavigationProps {
 export const COLAB_ALLOWED_TABS: TabType[] = [
   'dashboard',
   'fudo',
+  'mercadopago',
   'ventas',
   'compras',
   'gastos',
@@ -61,6 +64,7 @@ export const Navigation: React.FC<NavigationProps> = ({ activeTab, setActiveTab 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard BI', icon: LayoutDashboard },
     { id: 'fudo', label: 'Espejo Fudo POS', icon: UtensilsCrossed },
+    { id: 'mercadopago', label: 'Conciliación MP', icon: CreditCard },
     { id: 'ventas', label: 'Ventas', icon: TrendingUp },
     { id: 'compras', label: 'Proveedores', icon: Truck },
     { id: 'gastos', label: 'Pagos', icon: Receipt },

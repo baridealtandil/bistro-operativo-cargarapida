@@ -103,13 +103,68 @@ async function getFudoLiveMetrics() {
   }
 }
 
+const DEFAULT_MP_TOKEN = process.env.MERCADOPAGO_ACCESS_TOKEN || 'APP_USR-8198042150956293-091022-2bbdbf2826c401999b2a435a981d9074-836632087';
+
+async function getMercadoPagoLiveMetrics() {
+  try {
+    const todayStr = getArgentinaTodayStr();
+    const beginDateIso = `${todayStr}T00:00:00.000-03:00`;
+    const endDateIso = `${todayStr}T23:59:59.999-03:00`;
+
+    const searchUrl = `https://api.mercadopago.com/v1/payments/search?sort=date_created&criteria=desc&begin_date=${beginDateIso}&end_date=${endDateIso}&limit=100`;
+    const res = await fetch(searchUrl, {
+      headers: { 'Authorization': `Bearer ${DEFAULT_MP_TOKEN}` }
+    });
+
+    if (!res.ok) return null;
+    const data = await res.json();
+    const results = (data.results || []).filter((p: any) => p.status === 'approved');
+
+    let grossTotal = 0;
+    let netTotal = 0;
+    let feesTotal = 0;
+    let taxesTotal = 0;
+
+    results.forEach((p: any) => {
+      const gross = Number(p.transaction_amount || 0);
+      const net = Number(p.transaction_details?.net_received_amount || gross);
+      let mpFee = 0;
+      (p.fee_details || []).forEach((f: any) => { mpFee += Number(f.amount || 0); });
+      let taxes = 0;
+      (p.charges_details || []).forEach((c: any) => {
+        if (c.type === 'tax') taxes += Number(c.amounts?.original || 0);
+      });
+
+      grossTotal += gross;
+      netTotal += net;
+      feesTotal += mpFee;
+      taxesTotal += taxes;
+    });
+
+    return {
+      todayStr,
+      paymentsCount: results.length,
+      grossTotal: Math.round(grossTotal),
+      netTotal: Math.round(netTotal),
+      feesTotal: Math.round(feesTotal * 100) / 100,
+      taxesTotal: Math.round(taxesTotal * 100) / 100,
+    };
+  } catch (e) {
+    console.error('Error fetching MP live metrics in chat API:', e);
+    return null;
+  }
+}
+
 export async function POST(req: Request) {
   try {
     const { prompt, contextData } = await req.json();
     const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
 
-    // Fetch up-to-the-second live Fudo metrics
-    const fudoLive = await getFudoLiveMetrics();
+    // Fetch up-to-the-second live Fudo & Mercado Pago metrics
+    const [fudoLive, mpLive] = await Promise.all([
+      getFudoLiveMetrics(),
+      getMercadoPagoLiveMetrics(),
+    ]);
 
     const fudoSection = fudoLive
       ? `
@@ -125,6 +180,18 @@ export async function POST(req: Request) {
 📊 DATOS DE FUDO POS:
 - Sincronizado dinámicamente con la API de Fudo POS.`;
 
+    const mpSection = mpLive
+      ? `
+💳 DATOS EN TIEMPO REAL DE MERCADO PAGO API (Cantina Pink - Día Actual: ${mpLive.todayStr}):
+- 🔹 Cobros Aprobados Hoy: ${mpLive.paymentsCount} cobros
+- 💵 Total Bruto Vendido por MP Hoy: $${mpLive.grossTotal.toLocaleString('es-AR')}
+- 🟢 Neto Limpio Acreditado en Cuenta Hoy: $${mpLive.netTotal.toLocaleString('es-AR')}
+- 🔻 Comisiones MP Deducidas Hoy: $${mpLive.feesTotal.toLocaleString('es-AR')}
+- 🏛️ Retenciones Impositivas (SIRTAC IIBB / Déb-Créd) Hoy: $${mpLive.taxesTotal.toLocaleString('es-AR')}`
+      : `
+💳 DATOS DE MERCADO PAGO:
+- Conectado a la API Oficial de Mercado Pago (Cantina Pink - ID 836632087).`;
+
     if (apiKey) {
       const genAI = new GoogleGenerativeAI(apiKey);
       const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
@@ -138,6 +205,8 @@ Eres un Asistente Financiero y de Inteligencia de Negocios (BI) experto en la in
 Tu objetivo es responder de forma concisa, conversacional, profesional y directa en español sobre la consulta del usuario basándote ÚNICAMENTE en los datos actuales del sistema en tiempo real:
 
 ${fudoSection}
+
+${mpSection}
 
 DATOS EN TIEMPO REAL DEL RESTAURANTE:
 - 💵 DINERO EN EFECTIVO DISPONIBLE (Caja Chica/Mayor): $${(contextData?.cajaMayorBalance || 0).toLocaleString('es-AR')}
@@ -159,9 +228,9 @@ DESGLOSE DE PROVEEDORES:
 ${suppliersSummary || 'Sin proveedores cargados'}
 
 Instrucciones:
-1. RESPONDE DIRECTAMENTE A LO QUE EL USUARIO PREGUNTA. Si pregunta sobre ventas de Fudo, Mediodía, Noche, Cubiertos o Cajas, usa los datos en tiempo real de Fudo POS.
+1. RESPONDE DIRECTAMENTE A LO QUE EL USUARIO PREGUNTA. Si pregunta sobre ventas de Fudo, Mercado Pago, comisiones, retenciones SIRTAC, Mediodía, Noche, Cubiertos o Cajas, usa los datos en tiempo real de Fudo POS y Mercado Pago API.
 2. Sé amigable, conversacional y ejecutivo. Usa negritas y formato markdown claro.
-3. Si pregunta por un proveedor o un saldo en particular, responde con los datos de ese proveedor o cuenta.
+3. Si pregunta por un proveedor, comisiones de MP o conciliación, responde con la información detallada disponible.
 `;
 
       const result = await model.generateContent([systemPrompt, `Pregunta del usuario: ${prompt}`]);
@@ -196,10 +265,21 @@ Instrucciones:
       reply = `💵 **Dinero en Efectivo Disponible (Caja Chica / Mayor)**:\n\n` +
         `El saldo líquido real disponible actualmente en caja es **$${cajaVal}**.\n\n` +
         `Este monto refleja la apertura de caja más las ventas cobradas en efectivo menos los pagos o gastos abonados en efectivo.`;
-    } else if (query.includes('mercadopago') || query.includes('mercado pago') || query.includes('mp') || query.includes('cuenta digital')) {
-      reply = `💳 **Saldo Disponible en MercadoPago**:\n\n` +
-        `El saldo disponible en tu cuenta de MercadoPago es **$${mpVal}**.\n\n` +
-        `Este saldo contempla el monto de apertura digital, las ventas acreditadas por QR/tarjeta y los egresos o transferencias realizadas.`;
+    } else if (query.includes('mercadopago') || query.includes('mercado pago') || query.includes('mp') || query.includes('conciliacion') || query.includes('conciliación') || query.includes('comision') || query.includes('comisión') || query.includes('retencion') || query.includes('retención')) {
+      if (mpLive) {
+        reply = `💳 **Métricas en Tiempo Real de Mercado Pago API (Cantina Pink)**:\n\n` +
+          `- 🔹 **Cobros Aprobados Hoy**: **${mpLive.paymentsCount} cobros**\n` +
+          `- 💵 **Bruto Cobrado Hoy**: **$${mpLive.grossTotal.toLocaleString('es-AR')}**\n` +
+          `- 🟢 **Neto Acreditado Limpio**: **$${mpLive.netTotal.toLocaleString('es-AR')}**\n` +
+          `- 🔻 **Comisiones MP Deducidas**: **$${mpLive.feesTotal.toLocaleString('es-AR')}**\n` +
+          `- 🏛️ **Retenciones Impositivas (SIRTAC/Imp. Créd-Déb)**: **$${mpLive.taxesTotal.toLocaleString('es-AR')}**\n` +
+          `- 🏦 **Saldo Disponible en Mercado Pago**: **$${mpVal}**\n\n` +
+          `*Puedes ver la conciliación venta por venta Fudo vs Mercado Pago en la pestaña **Conciliación Mercado Pago**.*`;
+      } else {
+        reply = `💳 **Saldo y Conciliación MercadoPago**:\n\n` +
+          `El saldo disponible en tu cuenta de MercadoPago es **$${mpVal}**.\n\n` +
+          `Puedes ver la conciliación venta por venta con Fudo POS en la pestaña **Conciliación Mercado Pago**.`;
+      }
     } else if (query.includes('banco') || query.includes('bancaria') || query.includes('galicia') || query.includes('nacion') || query.includes('cuenta corriente')) {
       reply = `🏦 **Saldo Disponible en Cuentas Bancarias**:\n\n` +
         `El saldo total consolidado en cuentas bancarias es **$${bancoVal}**.\n\n` +
@@ -234,12 +314,13 @@ Instrucciones:
       reply = `🤖 **Asistente Inteligente del Restaurante**:\n\n` +
         `Te comparto los datos en tiempo real del restaurante:\n\n` +
         (fudoLive ? `- 🍽️ **Ventas Fudo Hoy**: **$${fudoLive.todayTotal.toLocaleString('es-AR')}** (Mediodía: $${fudoLive.todayMediodia.toLocaleString('es-AR')}, Noche: $${fudoLive.todayNoche.toLocaleString('es-AR')})\n` : '') +
+        (mpLive ? `- 💳 **Mercado Pago Hoy**: **$${mpLive.netTotal.toLocaleString('es-AR')} neto** de $${mpLive.grossTotal.toLocaleString('es-AR')} bruto (${mpLive.paymentsCount} cobros)\n` : '') +
         `- 💵 **Efectivo en Caja**: **$${cajaVal}**\n` +
-        `- 💳 **MercadoPago**: **$${mpVal}**\n` +
+        `- 💳 **MercadoPago Saldo**: **$${mpVal}**\n` +
         `- 🏦 **Cuentas Bancarias**: **$${bancoVal}**\n` +
         `- 🚚 **Deuda a Proveedores**: **$${totalDebt}**\n` +
         `- 📈 **Ventas del Mes**: **$${totalSales}**\n\n` +
-        `*¿En qué puedo ayudarte? Puedes preguntarme sobre turnos de Fudo, cubiertos, proveedores o cuentas.*`;
+        `*¿En qué puedo ayudarte? Puedes preguntarme sobre turnos de Fudo, Mercado Pago, comisiones, proveedores o cuentas.*`;
     }
 
     return NextResponse.json({ reply });
