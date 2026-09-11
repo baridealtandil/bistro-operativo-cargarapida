@@ -342,19 +342,25 @@ export async function POST(request: Request) {
       sEndObj.setDate(sEndObj.getDate() + 1);
       const sEndStr = sEndObj.toISOString().split('T')[0];
 
-      const filterParam = `filter[createdAt]=and(gte.${sStartStr}T00:00:00Z,lte.${sEndStr}T23:59:59Z)`;
-      const url = `${FUDO_API_BASE}/sales?include=payments&sort=createdAt&page[size]=500&${filterParam}`;
+      let allFudoSales: any[] = [];
+      const salePaymentMethodMap: Record<string, string> = {};
+      let fPage = 1;
+      let fHasMore = true;
 
-      const fRes = await fetch(url, {
-        headers: { 'Authorization': `Bearer ${fudoToken}`, 'Accept': 'application/json' }
-      });
+      while (fHasMore && fPage <= 25) {
+        const filterParam = `filter[createdAt]=and(gte.${sStartStr}T00:00:00Z,lte.${sEndStr}T23:59:59Z)`;
+        const url = `${FUDO_API_BASE}/sales?include=payments&sort=createdAt&page[size]=100&page[number]=${fPage}&${filterParam}`;
 
-      if (fRes.ok) {
+        const fRes = await fetch(url, {
+          headers: { 'Authorization': `Bearer ${fudoToken}`, 'Accept': 'application/json' }
+        });
+
+        if (!fRes.ok) break;
+
         const fData = await fRes.json();
         const sales = fData.data || [];
         const included = fData.included || [];
 
-        const salePaymentMethodMap: Record<string, string> = {};
         included.forEach((inc: any) => {
           if (inc.type === 'Payment') {
             const saleId = inc.relationships?.sale?.data?.id;
@@ -366,26 +372,30 @@ export async function POST(request: Request) {
           }
         });
 
-        fudoDigitalSales = sales
-          .filter((s: any) => s.attributes?.saleState === 'CLOSED')
-          .map((s: any) => {
-            const createdAt = s.attributes?.createdAt || '';
-            const { dateStr, artHour, shift } = getArgentinaDateTime(createdAt);
-            const fudoPmName = salePaymentMethodMap[String(s.id)] || 'Efectivo';
-            return {
-              id: String(s.id),
-              createdAt,
-              dateStr: formatShortDate(dateStr),
-              rawDateStr: dateStr,
-              hour: artHour,
-              shift,
-              total: Number(s.attributes?.total || 0),
-              people: Number(s.attributes?.people || 0),
-              fudoPaymentMethod: fudoPmName,
-            };
-          })
-          .filter((s: any) => s.rawDateStr >= startDate && s.rawDateStr <= endDate);
+        allFudoSales = allFudoSales.concat(sales);
+        if (sales.length < 100) fHasMore = false;
+        else fPage++;
       }
+
+      fudoDigitalSales = allFudoSales
+        .filter((s: any) => s.attributes?.saleState === 'CLOSED')
+        .map((s: any) => {
+          const createdAt = s.attributes?.createdAt || '';
+          const { dateStr, artHour, shift } = getArgentinaDateTime(createdAt);
+          const fudoPmName = salePaymentMethodMap[String(s.id)] || 'Efectivo';
+          return {
+            id: String(s.id),
+            createdAt,
+            dateStr: formatShortDate(dateStr),
+            rawDateStr: dateStr,
+            hour: artHour,
+            shift,
+            total: Number(s.attributes?.total || 0),
+            people: Number(s.attributes?.people || 0),
+            fudoPaymentMethod: fudoPmName,
+          };
+        })
+        .filter((s: any) => s.rawDateStr >= startDate && s.rawDateStr <= endDate);
     }
 
     // 4. Perform Reconciliation matching Fudo vs Mercado Pago Incomes

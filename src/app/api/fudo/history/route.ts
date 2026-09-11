@@ -95,16 +95,16 @@ export async function POST(request: Request) {
     let allPayments: any[] = [];
     let pmPage = 1;
     let pmHasMore = true;
-    while (pmHasMore && pmPage <= 10) {
+    while (pmHasMore && pmPage <= 25) {
       const pmFilter = `filter[createdAt]=and(gte.${pStartStr}T00:00:00Z,lte.${pEndStr}T23:59:59Z)`;
-      const pRes = await fetch(`${FUDO_API_BASE}/payments?page[size]=500&page[number]=${pmPage}&${pmFilter}`, {
+      const pRes = await fetch(`${FUDO_API_BASE}/payments?page[size]=100&page[number]=${pmPage}&${pmFilter}`, {
         headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
       });
       if (!pRes.ok) break;
       const pData = await pRes.json();
       const pList = pData.data || [];
       allPayments = allPayments.concat(pList);
-      if (pList.length < 500) pmHasMore = false;
+      if (pList.length < 100) pmHasMore = false;
       else pmPage++;
     }
 
@@ -143,10 +143,10 @@ export async function POST(request: Request) {
 
     let allRawSales: any[] = [];
     let pageNumber = 1;
-    const pageSize = 500;
+    const pageSize = 100;
     let hasMore = true;
 
-    while (hasMore && pageNumber <= 10) {
+    while (hasMore && pageNumber <= 25) {
       const filterParam = `filter[createdAt]=and(gte.${sStartStr}T00:00:00Z,lte.${sEndStr}T23:59:59Z)`;
       const url = `${FUDO_API_BASE}/sales?sort=createdAt&page[size]=${pageSize}&page[number]=${pageNumber}&${filterParam}`;
 
