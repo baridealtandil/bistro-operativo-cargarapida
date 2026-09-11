@@ -42,7 +42,7 @@ async function getFudoToken(apiKey = DEFAULT_API_KEY, apiSecret = DEFAULT_API_SE
 // Convert UTC ISO timestamp to local Argentina Date (UTC-3)
 function getArgentinaDateTime(isoDateString: string): { dateStr: string; artHour: number; shift: 'MEDIODIA' | 'NOCHE' } {
   const d = new Date(isoDateString);
-  const artMs = d.getTime() - (3 * 60 * 60 * 1000);
+  const artMs = d.getTime() - (3 * 3600 * 1000);
   const artDate = new Date(artMs);
   const dateStr = artDate.toISOString().split('T')[0];
   const artHour = artDate.getUTCHours();
@@ -75,12 +75,20 @@ export async function POST(request: Request) {
       pmMap[pm.id] = pm.attributes?.name || '';
     });
 
-    // 2. Fetch Payments for date range
+    // 2. Fetch Payments for date range (expanded by 1 day before/after for timezone buffer)
+    const pStartObj = new Date(startDate);
+    pStartObj.setDate(pStartObj.getDate() - 1);
+    const pStartStr = pStartObj.toISOString().split('T')[0];
+
+    const pEndObj = new Date(endDate);
+    pEndObj.setDate(pEndObj.getDate() + 1);
+    const pEndStr = pEndObj.toISOString().split('T')[0];
+
     let allPayments: any[] = [];
     let pmPage = 1;
     let pmHasMore = true;
     while (pmHasMore && pmPage <= 10) {
-      const pmFilter = `filter[createdAt]=and(gte.${startDate}T00:00:00Z,lte.${endDate}T23:59:59Z)`;
+      const pmFilter = `filter[createdAt]=and(gte.${pStartStr}T00:00:00Z,lte.${pEndStr}T23:59:59Z)`;
       const pRes = await fetch(`${FUDO_API_BASE}/payments?page[size]=500&page[number]=${pmPage}&${pmFilter}`, {
         headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
       });
@@ -92,29 +100,27 @@ export async function POST(request: Request) {
       else pmPage++;
     }
 
-    // Map payments by Argentina date and shift
-    const shiftPaymentsMap: Record<string, { cash: number; digital: number }> = {};
+    // Map payments strictly by saleId (only payments linked to closed sales)
+    const salePaymentMap: Record<string, { cash: number; digital: number }> = {};
     allPayments.forEach((p: any) => {
       const attrs = p.attributes || {};
       if (attrs.canceled) return;
-      const createdAt = attrs.createdAt;
-      if (!createdAt) return;
-
-      const { dateStr, shift } = getArgentinaDateTime(createdAt);
-      const key = `${dateStr}_${shift}`;
+      const saleId = p.relationships?.sale?.data?.id;
+      if (!saleId) return; // Ignore unlinked cash drawer movements!
 
       const amount = Number(attrs.amount || 0);
       const pmId = p.relationships?.paymentMethod?.data?.id;
       const pmName = pmId ? (pmMap[pmId] || '') : '';
+      const isCash = pmName.toLowerCase().includes('efectivo');
 
-      if (!shiftPaymentsMap[key]) {
-        shiftPaymentsMap[key] = { cash: 0, digital: 0 };
+      if (!salePaymentMap[saleId]) {
+        salePaymentMap[saleId] = { cash: 0, digital: 0 };
       }
 
-      if (pmName.toLowerCase().includes('efectivo')) {
-        shiftPaymentsMap[key].cash += amount;
+      if (isCash) {
+        salePaymentMap[saleId].cash += amount;
       } else {
-        shiftPaymentsMap[key].digital += amount;
+        salePaymentMap[saleId].digital += amount;
       }
     });
 
@@ -199,7 +205,6 @@ export async function POST(request: Request) {
       const people = Number(attrs.people || 0);
 
       if (!shiftMap[key]) {
-        const pInfo = shiftPaymentsMap[key] || { cash: 0, digital: 0 };
         shiftMap[key] = {
           date: dateStr,
           shift,
@@ -208,8 +213,8 @@ export async function POST(request: Request) {
           canceledOrdersCount: 0,
           inCourseOrdersCount: 0,
           totalPeople: 0,
-          cashAmount: pInfo.cash,
-          digitalAmount: pInfo.digital,
+          cashAmount: 0,
+          digitalAmount: 0,
         };
       }
 
@@ -219,18 +224,21 @@ export async function POST(request: Request) {
         shiftObj.totalGross += total;
         shiftObj.closedOrdersCount += 1;
         shiftObj.totalPeople += people;
+
+        const pInfo = salePaymentMap[sale.id];
+        if (pInfo && (pInfo.cash > 0 || pInfo.digital > 0)) {
+          shiftObj.cashAmount += pInfo.cash;
+          shiftObj.digitalAmount += pInfo.digital;
+        } else {
+          // Fallback if payment detail unlinked
+          const c = Math.round(total * 0.45);
+          shiftObj.cashAmount += c;
+          shiftObj.digitalAmount += (total - c);
+        }
       } else if (state === 'CANCELED') {
         shiftObj.canceledOrdersCount += 1;
       } else if (state === 'IN-COURSE') {
         shiftObj.inCourseOrdersCount += 1;
-      }
-    });
-
-    // Fallback payment split if payments map is empty for a shift with gross sales
-    Object.values(shiftMap).forEach(sObj => {
-      if (sObj.cashAmount === 0 && sObj.digitalAmount === 0 && sObj.totalGross > 0) {
-        sObj.cashAmount = Math.round(sObj.totalGross * 0.45);
-        sObj.digitalAmount = sObj.totalGross - sObj.cashAmount;
       }
     });
 

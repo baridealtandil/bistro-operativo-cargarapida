@@ -143,10 +143,10 @@ export const FudoLiveDashboard: React.FC = () => {
 
   useEffect(() => {
     fetchDashboardData();
-    // Auto-refresh every 30s for live data
+    // Auto-refresh every 15 minutes (15 * 60 * 1000 ms)
     const timer = setInterval(() => {
       fetchDashboardData();
-    }, 30000);
+    }, 15 * 60 * 1000);
     return () => clearInterval(timer);
   }, [period, customStart, customEnd]);
 
@@ -277,7 +277,7 @@ export const FudoLiveDashboard: React.FC = () => {
                 <h3 className="text-base font-black text-white">DATOS EN VIVO HOY ({formatDateDDMMAAAA(data.todayStr)})</h3>
               </div>
               <span className="text-xs text-emerald-400 font-mono font-bold bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
-                Actualizado automáticamente en tiempo real
+                Actualizado automáticamente cada 15 minutos
               </span>
             </div>
 
