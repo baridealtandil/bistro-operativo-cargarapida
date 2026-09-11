@@ -363,6 +363,8 @@ export async function POST(request: Request) {
         return false;
       });
 
+      const isCashSale = fudoSale.fudoPaymentMethod === 'Efectivo';
+
       if (match) {
         mpUsedIds.add(match.id);
         reconciliationRows.push({
@@ -378,13 +380,29 @@ export async function POST(request: Request) {
           mpTax: match.taxAmount,
           mpDevice: match.deviceLabel,
           mpDate: match.dateStr,
-          mpDescription: match.description,
+          mpDescription: isCashSale 
+            ? 'Conciliado (Cargado en Fudo como Efectivo, Cobrado en MP)'
+            : match.description,
+        });
+      } else if (isCashSale) {
+        // Legitimate Fudo Cash Sale - NOT an MP descalce
+        reconciliationRows.push({
+          status: 'FUDO_CASH',
+          fudoSaleId: fudoSale.id,
+          fudoTotal: fudoSale.total,
+          fudoShift: fudoSale.shift,
+          fudoDate: fudoSale.dateStr,
+          mpPaymentId: null,
+          mpGross: 0,
+          mpNet: 0,
+          mpFee: 0,
+          mpTax: 0,
+          mpDevice: 'N/A',
+          mpDate: fudoSale.dateStr,
+          mpDescription: 'Venta Efectivo (Fudo)',
         });
       } else {
-        const detailText = fudoSale.fudoPaymentMethod === 'Efectivo'
-          ? 'Efectivo'
-          : `Venta ${fudoSale.fudoPaymentMethod} (Fudo)`;
-
+        // Declared in Fudo as MP/Digital, but NOT received in MP API - True MP Descalce
         reconciliationRows.push({
           status: 'UNMATCHED_FUDO',
           fudoSaleId: fudoSale.id,
@@ -398,7 +416,7 @@ export async function POST(request: Request) {
           mpTax: 0,
           mpDevice: 'N/A',
           mpDate: fudoSale.dateStr,
-          mpDescription: detailText,
+          mpDescription: `Venta ${fudoSale.fudoPaymentMethod} en Fudo sin acreditación MP`,
         });
       }
     });

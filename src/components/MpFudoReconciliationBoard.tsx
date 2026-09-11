@@ -37,7 +37,7 @@ export const MpFudoReconciliationBoard: React.FC<MpFudoReconciliationBoardProps>
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<'ALL' | 'RECONCILED' | 'UNMATCHED_FUDO' | 'UNMATCHED_MP' | 'EGRESOS'>('ALL');
+  const [activeTab, setActiveTab] = useState<'ALL' | 'RECONCILED' | 'UNMATCHED_FUDO' | 'UNMATCHED_MP' | 'FUDO_CASH' | 'EGRESOS'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [showExplanation, setShowExplanation] = useState(true);
 
@@ -93,11 +93,13 @@ export const MpFudoReconciliationBoard: React.FC<MpFudoReconciliationBoardProps>
   const reconciledRows = useMemo(() => rows.filter(r => r.status === 'RECONCILED'), [rows]);
   const unmatchedFudoRows = useMemo(() => rows.filter(r => r.status === 'UNMATCHED_FUDO'), [rows]);
   const unmatchedMpRows = useMemo(() => rows.filter(r => r.status === 'UNMATCHED_MP'), [rows]);
+  const fudoCashRows = useMemo(() => rows.filter(r => r.status === 'FUDO_CASH'), [rows]);
   const egresosRows = useMemo(() => rows.filter(r => r.status === 'EGRESO_MP'), [rows]);
 
   const reconciledTotal = useMemo(() => reconciledRows.reduce((sum, r) => sum + (r.fudoTotal || 0), 0), [reconciledRows]);
   const unmatchedFudoTotal = useMemo(() => unmatchedFudoRows.reduce((sum, r) => sum + (r.fudoTotal || 0), 0), [unmatchedFudoRows]);
   const unmatchedMpTotal = useMemo(() => unmatchedMpRows.reduce((sum, r) => sum + (r.mpGross || 0), 0), [unmatchedMpRows]);
+  const fudoCashTotal = useMemo(() => fudoCashRows.reduce((sum, r) => sum + (r.fudoTotal || 0), 0), [fudoCashRows]);
 
   // Filtered rows for drilldown table
   const filteredRows = useMemo(() => {
@@ -105,6 +107,7 @@ export const MpFudoReconciliationBoard: React.FC<MpFudoReconciliationBoardProps>
       if (activeTab === 'RECONCILED' && r.status !== 'RECONCILED') return false;
       if (activeTab === 'UNMATCHED_FUDO' && r.status !== 'UNMATCHED_FUDO') return false;
       if (activeTab === 'UNMATCHED_MP' && r.status !== 'UNMATCHED_MP') return false;
+      if (activeTab === 'FUDO_CASH' && r.status !== 'FUDO_CASH') return false;
       if (activeTab === 'EGRESOS' && r.status !== 'EGRESO_MP') return false;
 
       if (searchQuery.trim()) {
@@ -281,7 +284,7 @@ export const MpFudoReconciliationBoard: React.FC<MpFudoReconciliationBoardProps>
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 pt-1">
             {/* Matched */}
             <div className="bg-emerald-950/30 border border-emerald-500/30 p-3 rounded-xl space-y-1">
               <div className="font-bold text-emerald-400 flex items-center gap-1.5">
@@ -292,21 +295,35 @@ export const MpFudoReconciliationBoard: React.FC<MpFudoReconciliationBoardProps>
                 ${reconciledTotal.toLocaleString('es-AR')}
               </div>
               <div className="text-[10px] text-slate-400">
-                {reconciledRows.length} ventas verificadas coincidentes en Fudo y Mercado Pago.
+                {reconciledRows.length} ventas coincidentes en Fudo y Mercado Pago.
               </div>
             </div>
 
-            {/* Fudo without MP */}
-            <div className="bg-amber-950/30 border border-amber-500/30 p-3 rounded-xl space-y-1">
-              <div className="font-bold text-amber-400 flex items-center gap-1.5">
+            {/* Fudo MP without MP */}
+            <div className="bg-rose-950/30 border border-rose-500/30 p-3 rounded-xl space-y-1">
+              <div className="font-bold text-rose-400 flex items-center gap-1.5">
                 <AlertCircle className="w-3.5 h-3.5" />
-                Declaradas en Fudo sin Acreditación MP
+                MP Descalce Real (Fudo MP s/ MP)
               </div>
               <div className="text-lg font-black text-white">
                 ${unmatchedFudoTotal.toLocaleString('es-AR')}
               </div>
               <div className="text-[10px] text-slate-400">
-                {unmatchedFudoRows.length} ventas en Fudo. Posibles cobros en efectivo anotados como MP por mozos o fallos en cobro QR.
+                {unmatchedFudoRows.length} ventas declaradas como MP sin cobro en la cuenta de MP.
+              </div>
+            </div>
+
+            {/* Fudo Cash */}
+            <div className="bg-slate-950 border border-slate-700 p-3 rounded-xl space-y-1">
+              <div className="font-bold text-slate-300 flex items-center gap-1.5">
+                <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
+                Ventas Fudo en Efectivo
+              </div>
+              <div className="text-lg font-black text-white">
+                ${fudoCashTotal.toLocaleString('es-AR')}
+              </div>
+              <div className="text-[10px] text-slate-400">
+                {fudoCashRows.length} ventas en efectivo descontadas del cálculo de descalce MP.
               </div>
             </div>
 
@@ -314,13 +331,13 @@ export const MpFudoReconciliationBoard: React.FC<MpFudoReconciliationBoardProps>
             <div className="bg-sky-950/30 border border-sky-500/30 p-3 rounded-xl space-y-1">
               <div className="font-bold text-sky-400 flex items-center gap-1.5">
                 <TrendingUp className="w-3.5 h-3.5" />
-                Cobradas en MP sin Registro en Fudo
+                Cobradas en MP s/ Registro Fudo
               </div>
               <div className="text-lg font-black text-white">
                 ${unmatchedMpTotal.toLocaleString('es-AR')}
               </div>
               <div className="text-[10px] text-slate-400">
-                {unmatchedMpRows.length} cobros en MP no cargados en Fudo POS (cobros directos o propinas digitales).
+                {unmatchedMpRows.length} cobros en MP no cargados en Fudo POS.
               </div>
             </div>
           </div>
@@ -358,11 +375,22 @@ export const MpFudoReconciliationBoard: React.FC<MpFudoReconciliationBoardProps>
               onClick={() => setActiveTab('UNMATCHED_FUDO')}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
                 activeTab === 'UNMATCHED_FUDO'
-                  ? 'bg-amber-500 text-slate-950 shadow-md'
+                  ? 'bg-rose-500 text-white shadow-md'
                   : 'text-slate-400 hover:text-white hover:bg-slate-900'
               }`}
             >
-              Solo en Fudo 🔴 ({unmatchedFudoRows.length})
+              Descalce MP 🔴 ({unmatchedFudoRows.length})
+            </button>
+
+            <button
+              onClick={() => setActiveTab('FUDO_CASH')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                activeTab === 'FUDO_CASH'
+                  ? 'bg-slate-800 text-emerald-300 border border-slate-700 shadow-md'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-900'
+              }`}
+            >
+              Efectivo Fudo 💵 ({fudoCashRows.length})
             </button>
 
             <button
@@ -427,6 +455,7 @@ export const MpFudoReconciliationBoard: React.FC<MpFudoReconciliationBoardProps>
                   const isReconciled = row.status === 'RECONCILED';
                   const isUnmatchedFudo = row.status === 'UNMATCHED_FUDO';
                   const isUnmatchedMp = row.status === 'UNMATCHED_MP';
+                  const isFudoCash = row.status === 'FUDO_CASH';
                   const isEgreso = row.status === 'EGRESO_MP';
 
                   return (
@@ -445,8 +474,13 @@ export const MpFudoReconciliationBoard: React.FC<MpFudoReconciliationBoardProps>
                           </span>
                         )}
                         {isUnmatchedFudo && (
-                          <span className="inline-flex items-center gap-1 bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                            <AlertCircle className="w-3 h-3 text-amber-400" /> Solo Fudo
+                          <span className="inline-flex items-center gap-1 bg-rose-500/20 text-rose-300 border border-rose-500/30 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                            <AlertCircle className="w-3 h-3 text-rose-400" /> Descalce MP
+                          </span>
+                        )}
+                        {isFudoCash && (
+                          <span className="inline-flex items-center gap-1 bg-slate-800 text-emerald-300 border border-slate-700 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                            <DollarSign className="w-3 h-3 text-emerald-400" /> Efectivo Fudo
                           </span>
                         )}
                         {isUnmatchedMp && (
