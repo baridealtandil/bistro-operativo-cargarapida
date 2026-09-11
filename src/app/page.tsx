@@ -16,6 +16,7 @@ import { SociosView } from '../components/SociosView';
 import { DishesView } from '../components/DishesView';
 import { AiChatView } from '../components/AiChatView';
 import { MakeIntegrationView } from '../components/MakeIntegrationView';
+import { FudoLiveDashboard } from '../components/FudoLiveDashboard';
 import { AdminPinModal as EmployeesPinModal } from '../components/AdminPinModal';
 import { PinLoginModal } from '../components/PinLoginModal';
 
@@ -56,6 +57,7 @@ function MainAppContent() {
 
         <main className="flex-1 p-4 md:p-6 overflow-y-auto">
           {activeTab === 'dashboard' && <DashboardView onNavigate={(tab) => handleTabChange(tab)} />}
+          {activeTab === 'fudo' && <FudoLiveDashboard />}
           {activeTab === 'ventas' && <SalesView />}
           {activeTab === 'compras' && <SuppliersView />}
           {activeTab === 'gastos' && <ExpensesView />}

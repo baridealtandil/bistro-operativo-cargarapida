@@ -45,7 +45,8 @@ function getShiftFromDate(isoDateString: string): 'MEDIODIA' | 'NOCHE' {
   const utcHour = date.getUTCHours();
   const artHour = (utcHour - 3 + 24) % 24;
 
-  if (artHour >= 6 && artHour < 17) {
+  // Mediodía: 07:00 hs a 17:59 hs
+  if (artHour >= 7 && artHour < 18) {
     return 'MEDIODIA';
   }
   return 'NOCHE';
@@ -203,7 +204,7 @@ export async function POST(request: Request) {
       }
     });
 
-    // Fallback payment split if zero
+    // Fallback payment split if payments map is empty for a shift with gross sales
     Object.values(shiftMap).forEach(sObj => {
       if (sObj.cashAmount === 0 && sObj.digitalAmount === 0 && sObj.totalGross > 0) {
         sObj.cashAmount = Math.round(sObj.totalGross * 0.45);
@@ -237,6 +238,7 @@ export async function POST(request: Request) {
         totalPeopleCount: grandTotalPeople,
         totalClosedOrders: grandTotalOrders,
         averageTicketPerCover: grandTotalPeople > 0 ? Math.round(grandTotalGross / grandTotalPeople) : 0,
+        averageTicketPerSale: grandTotalOrders > 0 ? Math.round(grandTotalGross / grandTotalOrders) : 0,
       },
       dailySummary: shiftSummary,
     });
