@@ -50,13 +50,21 @@ function getArgentinaDateTime(isoDateString: string): { dateStr: string; artHour
   return { dateStr, artHour, shift };
 }
 
+function getArgentinaTodayStr(d = new Date()): string {
+  const artMs = d.getTime() - (3 * 3600 * 1000);
+  const artDate = new Date(artMs);
+  const year = artDate.getUTCFullYear();
+  const month = String(artDate.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(artDate.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     let { startDate, endDate } = body; // YYYY-MM-DD
 
-    const nowArt = new Date(Date.now() - 3 * 3600 * 1000);
-    const todayStr = nowArt.toISOString().split('T')[0];
+    const todayStr = getArgentinaTodayStr();
 
     if (!startDate || !endDate) {
       startDate = todayStr;

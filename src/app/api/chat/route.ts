@@ -8,12 +8,21 @@ const DEFAULT_API_SECRET = process.env.FUDO_API_SECRET || 'bupmioSE6FRHA61RWgxv9
 
 function getArgentinaDateTime(isoDateString: string): { dateStr: string; artHour: number; shift: 'MEDIODIA' | 'NOCHE' } {
   const d = new Date(isoDateString);
-  const artMs = d.getTime() - (3 * 60 * 60 * 1000);
+  const artMs = d.getTime() - (3 * 3600 * 1000);
   const artDate = new Date(artMs);
   const dateStr = artDate.toISOString().split('T')[0];
   const artHour = artDate.getUTCHours();
   const shift = (artHour >= 7 && artHour < 18) ? 'MEDIODIA' : 'NOCHE';
   return { dateStr, artHour, shift };
+}
+
+function getArgentinaTodayStr(d = new Date()): string {
+  const artMs = d.getTime() - (3 * 3600 * 1000);
+  const artDate = new Date(artMs);
+  const year = artDate.getUTCFullYear();
+  const month = String(artDate.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(artDate.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 async function getFudoLiveMetrics() {
@@ -28,13 +37,14 @@ async function getFudoLiveMetrics() {
     const token = authData.token;
     if (!token) return null;
 
-    const nowArt = new Date(Date.now() - 3 * 3600 * 1000);
-    const todayStr = nowArt.toISOString().split('T')[0];
+    const todayStr = getArgentinaTodayStr();
     
+    const nowArt = new Date();
     const startDateObj = new Date(nowArt);
     startDateObj.setDate(nowArt.getDate() - 7);
-    const startDateStr = startDateObj.toISOString().split('T')[0];
+    const startDateStr = getArgentinaTodayStr(startDateObj);
 
+    // Expand buffer range by 1 day before and after for UTC offset
     const filterParam = `filter[createdAt]=and(gte.${startDateStr}T00:00:00Z,lte.${todayStr}T23:59:59Z)`;
     const salesRes = await fetch(`${FUDO_API_BASE}/sales?sort=createdAt&page[size]=500&${filterParam}`, {
       headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }

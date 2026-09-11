@@ -6,7 +6,7 @@ import { Plus, Sun, Moon, Users, DollarSign, Calendar, Filter, RefreshCw, Wallet
 import { Sale } from '../types/gastronomy';
 import { DateRangePicker } from './DateRangePicker';
 import { FudoSyncModal } from './FudoSyncModal';
-import { formatDateDDMMAAAA } from '../utils/formatters';
+import { formatDateDDMMAAAA, getLocalDateString } from '../utils/formatters';
 
 export const SalesView: React.FC = () => {
   const { sales, addSale, editSale, deleteSale, expenses, role, cajaMayorBalance, mercadoPagoBalance } = useGastronomy();
@@ -23,7 +23,7 @@ export const SalesView: React.FC = () => {
   const [filterPaymentMethod, setFilterPaymentMethod] = useState<string>('TODOS');
 
   // Form State para Nueva Venta / Edición
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState(getLocalDateString());
   const [shift, setShift] = useState<Sale['shift']>('MEDIODIA');
   const [covers, setCovers] = useState<string>('25');
   const [channel, setChannel] = useState<Sale['channel']>('SALON');

@@ -26,6 +26,7 @@ import {
 } from '../types/gastronomy';
 
 import importedData from '../data/imported_suppliers_data.json';
+import { getLocalDateString } from '../utils/formatters';
 
 // Interpreta un medio de pago en texto libre (Ventas/Gastos) y dice a qué
 // tipo de cuenta afecta. Única función de este tipo en todo el proyecto —
@@ -86,7 +87,7 @@ export function classifyExpenseGroup(category: string, group?: string): 'FUNCION
   return 'VARIOS';
 }
 
-const currentMonthKey = () => new Date().toISOString().slice(0, 7); // 'YYYY-MM'
+const currentMonthKey = () => getLocalDateString().slice(0, 7); // 'YYYY-MM'
 
 interface GastronomyContextType {
   role: UserRole;

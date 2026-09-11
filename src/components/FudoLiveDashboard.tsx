@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { formatDateDDMMAAAA } from '../utils/formatters';
+import { formatDateDDMMAAAA, getLocalDateString } from '../utils/formatters';
 import { DateRangePicker } from './DateRangePicker';
 import {
   TrendingUp,
@@ -38,8 +38,8 @@ import {
 
 export const FudoLiveDashboard: React.FC = () => {
   const [period, setPeriod] = useState<'TODAY' | '7DAYS' | 'MONTH' | 'PREV_MONTH' | 'CUSTOM'>('7DAYS');
-  const [customStart, setCustomStart] = useState<string>('2026-09-01');
-  const [customEnd, setCustomEnd] = useState<string>('2026-09-10');
+  const [customStart, setCustomStart] = useState<string>(getLocalDateString(new Date(Date.now() - 7 * 86400 * 1000)));
+  const [customEnd, setCustomEnd] = useState<string>(getLocalDateString());
   
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -118,8 +118,8 @@ export const FudoLiveDashboard: React.FC = () => {
         if (customEnd) end = new Date(customEnd);
       }
 
-      const startDate = start.toISOString().split('T')[0];
-      const endDate = end.toISOString().split('T')[0];
+      const startDate = getLocalDateString(start);
+      const endDate = getLocalDateString(end);
 
       const res = await fetch('/api/fudo/history', {
         method: 'POST',
