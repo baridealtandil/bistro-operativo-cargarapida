@@ -217,39 +217,29 @@ export const FudoLiveDashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Period Selector Buttons */}
-        <div className="flex flex-wrap items-center bg-slate-950 p-1.5 rounded-2xl border border-slate-800 shrink-0 gap-1">
+        {/* Period Selector Almanaque */}
+        <div className="flex flex-wrap items-center gap-3 bg-slate-950 p-2.5 rounded-2xl border border-slate-800 shrink-0">
+          <div className="text-slate-400 text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 pl-1">
+            <Calendar className="w-4 h-4 text-amber-400" />
+            Período:
+          </div>
+          <DateRangePicker
+            startDate={customStart}
+            endDate={customEnd}
+            onChange={(start, end) => {
+              setCustomStart(start);
+              setCustomEnd(end);
+              setPeriod('CUSTOM');
+            }}
+          />
           <button
-            onClick={() => setPeriod('TODAY')}
-            className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all ${
-              period === 'TODAY' ? 'bg-amber-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'
-            }`}
+            onClick={fetchDashboardData}
+            disabled={loading}
+            className="p-2 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl transition-all flex items-center gap-1.5 text-xs font-bold shadow-md disabled:opacity-50"
+            title="Actualizar datos en tiempo real"
           >
-            Hoy
-          </button>
-          <button
-            onClick={() => setPeriod('7DAYS')}
-            className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all ${
-              period === '7DAYS' ? 'bg-amber-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            Últimos 7 días
-          </button>
-          <button
-            onClick={() => setPeriod('MONTH')}
-            className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all ${
-              period === 'MONTH' ? 'bg-amber-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            Este Mes
-          </button>
-          <button
-            onClick={() => setPeriod('PREV_MONTH')}
-            className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all ${
-              period === 'PREV_MONTH' ? 'bg-amber-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            Mes Anterior
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">{loading ? 'Cargando...' : 'Actualizar'}</span>
           </button>
         </div>
       </div>

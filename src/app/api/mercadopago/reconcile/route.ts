@@ -5,11 +5,49 @@ const FUDO_AUTH_URL = 'https://auth.fu.do/api';
 const FUDO_API_BASE = 'https://api.fu.do/v1alpha1';
 
 const DEFAULT_MP_TOKEN = process.env.MERCADOPAGO_ACCESS_TOKEN || 'APP_USR-8198042150956293-091022-2bbdbf2826c401999b2a435a981d9074-836632087';
+const MP_CLIENT_ID = process.env.MERCADOPAGO_CLIENT_ID || '8198042150956293';
+const MP_CLIENT_SECRET = process.env.MERCADOPAGO_CLIENT_SECRET || 'Ppapgdmv1OVdrU4SKqtbbdEfNxG8GHCl';
+
 const DEFAULT_FUDO_KEY = process.env.FUDO_API_KEY || 'MjFAMTM3NTcy';
 const DEFAULT_FUDO_SECRET = process.env.FUDO_API_SECRET || 'bupmioSE6FRHA61RWgxv9AJnmrvjAqoI';
 
 const DEFAULT_OFFICIAL_AVAILABLE = 3174854.02;
 const DEFAULT_OFFICIAL_PENDING = 2562171.49;
+
+let cachedMpOAuthToken: string | null = null;
+let mpOAuthTokenExpiresAt = 0;
+
+async function getMercadoPagoOAuthToken(): Promise<string> {
+  const now = Math.floor(Date.now() / 1000);
+  if (cachedMpOAuthToken && mpOAuthTokenExpiresAt > now + 300) {
+    return cachedMpOAuthToken;
+  }
+
+  try {
+    const res = await fetch(`${MP_BASE}/oauth/token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({
+        client_id: MP_CLIENT_ID,
+        client_secret: MP_CLIENT_SECRET,
+        grant_type: 'client_credentials',
+      }),
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      if (data.access_token) {
+        cachedMpOAuthToken = data.access_token;
+        mpOAuthTokenExpiresAt = now + (data.expires_in || 21600);
+        return data.access_token;
+      }
+    }
+  } catch (e) {
+    console.error('Error fetching MP OAuth Token:', e);
+  }
+
+  return DEFAULT_MP_TOKEN;
+}
 
 function getArgentinaDateTime(isoDateString: string): { dateStr: string; artHour: number; shift: 'MEDIODIA' | 'NOCHE' } {
   const d = new Date(isoDateString);
@@ -85,9 +123,11 @@ export async function POST(request: Request) {
       endDate = todayStr;
     }
 
+    const mpToken = await getMercadoPagoOAuthToken();
+
     // 1. Fetch Mercado Pago Account info
     const meRes = await fetch(`${MP_BASE}/users/me`, {
-      headers: { 'Authorization': `Bearer ${DEFAULT_MP_TOKEN}` }
+      headers: { 'Authorization': `Bearer ${mpToken}` }
     });
     const meData = meRes.ok ? await meRes.json() : {};
     const accountInfo = {
@@ -108,7 +148,7 @@ export async function POST(request: Request) {
     while (hasMoreMP && offset < 500) {
       const searchUrl = `${MP_BASE}/v1/payments/search?sort=date_created&criteria=desc&begin_date=${beginDateIso}&end_date=${endDateIso}&limit=${limit}&offset=${offset}`;
       const mpRes = await fetch(searchUrl, {
-        headers: { 'Authorization': `Bearer ${DEFAULT_MP_TOKEN}` }
+        headers: { 'Authorization': `Bearer ${mpToken}` }
       });
 
       if (!mpRes.ok) break;
@@ -255,7 +295,6 @@ export async function POST(request: Request) {
         const sales = fData.data || [];
         const included = fData.included || [];
 
-        // Build map of saleId -> paymentMethodName
         const salePaymentMethodMap: Record<string, string> = {};
         included.forEach((inc: any) => {
           if (inc.type === 'Payment') {
