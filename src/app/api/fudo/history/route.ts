@@ -124,14 +124,22 @@ export async function POST(request: Request) {
       }
     });
 
-    // 3. Fetch paginated sales from Fudo
+    // 3. Fetch paginated sales from Fudo (expanded UTC range to cover Argentina UTC-3 offset completely)
+    const sStartObj = new Date(startDate);
+    sStartObj.setDate(sStartObj.getDate() - 1);
+    const sStartStr = sStartObj.toISOString().split('T')[0];
+
+    const sEndObj = new Date(endDate);
+    sEndObj.setDate(sEndObj.getDate() + 1);
+    const sEndStr = sEndObj.toISOString().split('T')[0];
+
     let allRawSales: any[] = [];
     let pageNumber = 1;
     const pageSize = 500;
     let hasMore = true;
 
     while (hasMore && pageNumber <= 10) {
-      const filterParam = `filter[createdAt]=and(gte.${startDate}T00:00:00Z,lte.${endDate}T23:59:59Z)`;
+      const filterParam = `filter[createdAt]=and(gte.${sStartStr}T00:00:00Z,lte.${sEndStr}T23:59:59Z)`;
       const url = `${FUDO_API_BASE}/sales?sort=createdAt&page[size]=${pageSize}&page[number]=${pageNumber}&${filterParam}`;
 
       const res = await fetch(url, {
@@ -157,29 +165,31 @@ export async function POST(request: Request) {
       }
     }
 
-    // Individual sales records for historical search engine
-    const historicalSales = allRawSales.map((sale: any) => {
-      const attrs = sale.attributes || {};
-      const createdAt = attrs.createdAt || '';
-      const { dateStr, artHour, shift } = getArgentinaDateTime(createdAt);
-      const total = Number(attrs.total || 0);
-      const people = Number(attrs.people || 0);
-      const state = attrs.saleState || 'UNKNOWN';
+    // Individual sales records for historical search engine (filtered strictly by Argentina local date range)
+    const historicalSales = allRawSales
+      .map((sale: any) => {
+        const attrs = sale.attributes || {};
+        const createdAt = attrs.createdAt || '';
+        const { dateStr, artHour, shift } = getArgentinaDateTime(createdAt);
+        const total = Number(attrs.total || 0);
+        const people = Number(attrs.people || 0);
+        const state = attrs.saleState || 'UNKNOWN';
 
-      return {
-        id: sale.id,
-        createdAt,
-        date: dateStr,
-        hour: artHour,
-        shift,
-        total,
-        people,
-        state,
-        comment: attrs.comment || '',
-      };
-    });
+        return {
+          id: sale.id,
+          createdAt,
+          date: dateStr,
+          hour: artHour,
+          shift,
+          total,
+          people,
+          state,
+          comment: attrs.comment || '',
+        };
+      })
+      .filter(sale => sale.date >= startDate && sale.date <= endDate);
 
-    // Group sales by date AND shift (YYYY-MM-DD + MEDIODIA / NOCHE)
+    // Group sales by Argentina local date AND shift (YYYY-MM-DD + MEDIODIA / NOCHE)
     const shiftMap: Record<string, {
       date: string;
       shift: 'MEDIODIA' | 'NOCHE';
@@ -198,6 +208,9 @@ export async function POST(request: Request) {
       if (!createdAt) return;
 
       const { dateStr, shift } = getArgentinaDateTime(createdAt);
+      // Filter out sales that fall outside requested Argentina date range
+      if (dateStr < startDate || dateStr > endDate) return;
+
       const key = `${dateStr}_${shift}`;
 
       const state = attrs.saleState || 'UNKNOWN';
