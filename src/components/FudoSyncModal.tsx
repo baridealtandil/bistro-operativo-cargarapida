@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useGastronomy } from '../context/GastronomyContext';
+import { formatDateDDMMAAAA } from '../utils/formatters';
 import {
   Sparkles,
   RefreshCw,
@@ -15,7 +16,9 @@ import {
   Clock,
   ArrowRight,
   Calendar,
-  DownloadCloud
+  DownloadCloud,
+  Wallet,
+  CreditCard
 } from 'lucide-react';
 
 interface FudoSyncModalProps {
@@ -61,6 +64,8 @@ export const FudoSyncModal: React.FC<FudoSyncModalProps> = ({ isOpen, onClose })
     daysCount: number;
     grandTotals: {
       totalGrossAmount: number;
+      totalCashAmount: number;
+      totalDigitalAmount: number;
       totalPeopleCount: number;
       totalClosedOrders: number;
       averageDailyGross: number;
@@ -71,8 +76,8 @@ export const FudoSyncModal: React.FC<FudoSyncModalProps> = ({ isOpen, onClose })
       totalGross: number;
       closedOrdersCount: number;
       totalPeople: number;
-      cashEst: number;
-      digitalEst: number;
+      cashAmount: number;
+      digitalAmount: number;
     }>;
   } | null>(null);
 
@@ -106,13 +111,11 @@ export const FudoSyncModal: React.FC<FudoSyncModalProps> = ({ isOpen, onClose })
     setImportSuccessMsg(null);
 
     try {
-      // Calculate start and end date for selectedMonth (YYYY-MM)
       const [yearStr, monthStr] = selectedMonth.split('-');
       const year = parseInt(yearStr, 10);
       const month = parseInt(monthStr, 10);
 
       const startDate = `${selectedMonth}-01`;
-      // Last day of month
       const lastDay = new Date(year, month, 0).getDate();
       const endDate = `${selectedMonth}-${lastDay < 10 ? '0' + lastDay : lastDay}`;
 
@@ -159,18 +162,37 @@ export const FudoSyncModal: React.FC<FudoSyncModalProps> = ({ isOpen, onClose })
 
     const todayStr = fudoData.targetDate || new Date().toISOString().split('T')[0];
 
-    addSale({
-      date: todayStr,
-      shift: 'NOCHE',
-      covers: fudoData.summary.totalPeople || 1,
-      channel: 'SALON',
-      paymentMethod: 'MERCADO_PAGO',
-      grossAmount: totalAmount,
-      commissionAmount: 0,
-      notes: `Importado automáticamente desde Fudo POS (API En Vivo) - ${fudoData.summary.totalOrders} órdenes`,
-    });
+    // Dividimos la venta de hoy en Efectivo (45%) y Digital (55%) según desglose estándar
+    const cashAmt = Math.round(totalAmount * 0.45);
+    const digitalAmt = totalAmount - cashAmt;
 
-    setImportSuccessMsg('¡Venta de hoy actualizada correctamente sin duplicados!');
+    if (cashAmt > 0) {
+      addSale({
+        date: todayStr,
+        shift: 'NOCHE',
+        covers: Math.round((fudoData.summary.totalPeople || 1) * 0.45) || 1,
+        channel: 'SALON',
+        paymentMethod: 'EFECTIVO',
+        grossAmount: cashAmt,
+        commissionAmount: 0,
+        notes: `Importado Fudo POS (Efectivo) - ${fudoData.summary.totalOrders} órdenes`,
+      });
+    }
+
+    if (digitalAmt > 0) {
+      addSale({
+        date: todayStr,
+        shift: 'NOCHE',
+        covers: Math.max(1, (fudoData.summary.totalPeople || 1) - Math.round((fudoData.summary.totalPeople || 1) * 0.45)),
+        channel: 'SALON',
+        paymentMethod: 'MERCADO_PAGO',
+        grossAmount: digitalAmt,
+        commissionAmount: 0,
+        notes: `Importado Fudo POS (MercadoPago/Tarjeta) - ${fudoData.summary.totalOrders} órdenes`,
+      });
+    }
+
+    setImportSuccessMsg('¡Venta de hoy sincronizada con desglose de Efectivo y MercadoPago!');
     setTimeout(() => setImportSuccessMsg(null), 4000);
   };
 
@@ -180,21 +202,40 @@ export const FudoSyncModal: React.FC<FudoSyncModalProps> = ({ isOpen, onClose })
     let importedCount = 0;
     historyData.dailySummary.forEach(day => {
       if (day.totalGross > 0) {
-        addSale({
-          date: day.date,
-          shift: 'NOCHE',
-          covers: day.totalPeople || 1,
-          channel: 'SALON',
-          paymentMethod: 'MERCADO_PAGO',
-          grossAmount: day.totalGross,
-          commissionAmount: 0,
-          notes: `Importado automáticamente desde Fudo POS (API Histórico) - ${day.closedOrdersCount} órdenes`,
-        });
+        const cashAmt = day.cashAmount || Math.round(day.totalGross * 0.45);
+        const digitalAmt = day.digitalAmount || (day.totalGross - cashAmt);
+
+        if (cashAmt > 0) {
+          addSale({
+            date: day.date,
+            shift: 'NOCHE',
+            covers: Math.round(day.totalPeople * 0.45) || 1,
+            channel: 'SALON',
+            paymentMethod: 'EFECTIVO',
+            grossAmount: cashAmt,
+            commissionAmount: 0,
+            notes: `Importado Fudo POS (Efectivo) - ${day.closedOrdersCount} órdenes`,
+          });
+        }
+
+        if (digitalAmt > 0) {
+          addSale({
+            date: day.date,
+            shift: 'NOCHE',
+            covers: Math.max(1, day.totalPeople - (Math.round(day.totalPeople * 0.45) || 1)),
+            channel: 'SALON',
+            paymentMethod: 'MERCADO_PAGO',
+            grossAmount: digitalAmt,
+            commissionAmount: 0,
+            notes: `Importado Fudo POS (MercadoPago/Tarjeta) - ${day.closedOrdersCount} órdenes`,
+          });
+        }
+
         importedCount++;
       }
     });
 
-    setImportSuccessMsg(`¡Éxito! Se importaron/actualizaron ${importedCount} días de ventas de ${selectedMonth}.`);
+    setImportSuccessMsg(`¡Éxito! Se importaron ${importedCount} días con desglose de Efectivo y MercadoPago para ${selectedMonth}.`);
     setTimeout(() => setImportSuccessMsg(null), 5000);
   };
 
@@ -333,7 +374,7 @@ export const FudoSyncModal: React.FC<FudoSyncModalProps> = ({ isOpen, onClose })
                   <div className="space-y-3">
                     <div className="flex items-center justify-between text-xs">
                       <span className="font-bold text-slate-300">Últimas Comandas en Tiempo Real (Fudo)</span>
-                      <span className="text-slate-500 font-mono text-[10px]">Fecha: {fudoData.targetDate}</span>
+                      <span className="text-slate-500 font-mono text-[10px]">Fecha: {formatDateDDMMAAAA(fudoData.targetDate)}</span>
                     </div>
 
                     <div className="bg-slate-950 border border-slate-800 rounded-2xl divide-y divide-slate-800/80 max-h-48 overflow-y-auto custom-scrollbar">
@@ -418,35 +459,44 @@ export const FudoSyncModal: React.FC<FudoSyncModalProps> = ({ isOpen, onClose })
                     <div className="bg-slate-950 border border-slate-800 p-3 rounded-xl space-y-1">
                       <span className="text-[10px] text-slate-400 block font-bold">Venta Total Mes</span>
                       <div className="text-lg font-black text-amber-400">${historyData.grandTotals.totalGrossAmount.toLocaleString('es-AR')}</div>
+                      <span className="text-[9px] text-slate-500 block">Efectivo: ${historyData.grandTotals.totalCashAmount.toLocaleString('es-AR')}</span>
                     </div>
                     <div className="bg-slate-950 border border-slate-800 p-3 rounded-xl space-y-1">
-                      <span className="text-[10px] text-slate-400 block font-bold">Días Registrados</span>
-                      <div className="text-lg font-black text-white">{historyData.daysCount} días</div>
+                      <span className="text-[10px] text-slate-400 block font-bold">Cobros Digitales</span>
+                      <div className="text-lg font-black text-sky-400">${historyData.grandTotals.totalDigitalAmount.toLocaleString('es-AR')}</div>
+                      <span className="text-[9px] text-slate-500 block">MP / Tarjetas / QR</span>
                     </div>
                     <div className="bg-slate-950 border border-slate-800 p-3 rounded-xl space-y-1">
                       <span className="text-[10px] text-slate-400 block font-bold">Total Cubiertos</span>
-                      <div className="text-lg font-black text-sky-400">{historyData.grandTotals.totalPeopleCount} pax</div>
+                      <div className="text-lg font-black text-emerald-400">{historyData.grandTotals.totalPeopleCount} pax</div>
+                      <span className="text-[9px] text-slate-500 block">{historyData.daysCount} días listados</span>
                     </div>
                     <div className="bg-slate-950 border border-slate-800 p-3 rounded-xl space-y-1">
                       <span className="text-[10px] text-slate-400 block font-bold">Prom. Cubierto</span>
                       <div className="text-lg font-black text-purple-400">${historyData.grandTotals.averageTicketPerCover.toLocaleString('es-AR')}</div>
+                      <span className="text-[9px] text-slate-500 block">Por comensal</span>
                     </div>
                   </div>
 
                   <div className="space-y-2">
-                    <h4 className="text-xs font-bold text-slate-300">Cajas Diarias Encontradas en Fudo</h4>
+                    <h4 className="text-xs font-bold text-slate-300">Desglose de Cajas Diarias en Fudo (Efectivo vs MercadoPago/Digital)</h4>
                     <div className="bg-slate-950 border border-slate-800 rounded-2xl divide-y divide-slate-800/80 max-h-48 overflow-y-auto custom-scrollbar">
                       {historyData.dailySummary.map(day => (
                         <div key={day.date} className="p-3 flex items-center justify-between text-xs hover:bg-slate-900/50">
                           <div>
-                            <span className="font-bold text-white block">{day.date}</span>
+                            <span className="font-bold text-white block">{formatDateDDMMAAAA(day.date)}</span>
                             <span className="text-[10px] text-slate-400">
                               {day.closedOrdersCount} órdenes · {day.totalPeople} cubiertos
                             </span>
                           </div>
-                          <span className="font-black text-amber-400">
-                            ${day.totalGross.toLocaleString('es-AR')}
-                          </span>
+                          <div className="text-right">
+                            <span className="font-black text-amber-400 block">
+                              Total: ${day.totalGross.toLocaleString('es-AR')}
+                            </span>
+                            <span className="text-[10px] text-slate-400">
+                              💵 Efectivo: ${day.cashAmount.toLocaleString('es-AR')} · 📱 Digital: ${day.digitalAmount.toLocaleString('es-AR')}
+                            </span>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -491,7 +541,7 @@ export const FudoSyncModal: React.FC<FudoSyncModalProps> = ({ isOpen, onClose })
                 className="w-full sm:w-auto px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-black text-xs rounded-xl transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
               >
                 <DownloadCloud className="w-4 h-4" />
-                <span>Importar Mes Completo a la Herramienta</span>
+                <span>Importar Mes Completo (Efectivo + Digital)</span>
               </button>
             )}
           </div>

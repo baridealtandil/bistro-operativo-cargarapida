@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useGastronomy, classifyPaymentMethod, classifyExpenseGroup } from '../context/GastronomyContext';
+import { formatDateDDMMAAAA } from '../utils/formatters';
 import { Plus, Search, CheckCircle2, DollarSign, X, CreditCard, Edit2, ShieldCheck, Building2, Landmark, Package } from 'lucide-react';
 import { SearchableCombobox } from './SearchableCombobox';
 import { DateRangePicker } from './DateRangePicker';
@@ -338,7 +339,7 @@ export const ExpensesView: React.FC = () => {
                   const grp = e.expenseGroup || classifyExpenseGroup(e.category);
                   return (
                     <tr key={e.id} className="hover:bg-slate-800/30 transition-colors">
-                      <td className="py-3 px-4 font-semibold text-slate-300 whitespace-nowrap">{e.date || e.dueDate}</td>
+                      <td className="py-3 px-4 font-semibold text-slate-300 whitespace-nowrap">{formatDateDDMMAAAA(e.date || e.dueDate)}</td>
                       <td className="py-3 px-4 font-semibold text-slate-100">{e.description}</td>
                       <td className="py-3 px-4 font-medium whitespace-nowrap">
                         <span className="inline-flex items-center gap-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded text-[10px] font-semibold">

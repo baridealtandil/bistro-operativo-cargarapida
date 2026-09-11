@@ -6,6 +6,7 @@ import { Plus, Sun, Moon, Users, DollarSign, Calendar, Filter, RefreshCw, Wallet
 import { Sale } from '../types/gastronomy';
 import { DateRangePicker } from './DateRangePicker';
 import { FudoSyncModal } from './FudoSyncModal';
+import { formatDateDDMMAAAA } from '../utils/formatters';
 
 export const SalesView: React.FC = () => {
   const { sales, addSale, editSale, deleteSale, expenses, role, cajaMayorBalance, mercadoPagoBalance } = useGastronomy();
@@ -452,7 +453,7 @@ export const SalesView: React.FC = () => {
                   const ticketPerCover = s.covers > 0 ? s.netAmount / s.covers : 0;
                   return (
                     <tr key={s.id} className="hover:bg-slate-800/40 transition-colors">
-                      <td className="p-3 font-medium text-white whitespace-nowrap">{s.date}</td>
+                      <td className="p-3 font-medium text-white whitespace-nowrap">{formatDateDDMMAAAA(s.date)}</td>
                       <td className="p-3">
                         {s.shift === 'MEDIODIA' ? (
                           <span className="flex items-center gap-1 bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded font-bold text-[10px] w-fit">
