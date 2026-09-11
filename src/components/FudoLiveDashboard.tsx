@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { formatDateDDMMAAAA, getLocalDateString } from '../utils/formatters';
 import { DateRangePicker } from './DateRangePicker';
+import { MpFudoReconciliationBoard } from './MpFudoReconciliationBoard';
 import {
   TrendingUp,
   DollarSign,
@@ -460,6 +461,14 @@ export const FudoLiveDashboard: React.FC = () => {
               </div>
             );
           })()}
+
+          {/* TABLERO DE CONCILIACIÓN FUDO MP ↔ MERCADO PAGO API */}
+          <MpFudoReconciliationBoard
+            startDate={data.startDate}
+            endDate={data.endDate}
+            fudoMpSalesAmount={data.grandTotals.totalDigitalAmount}
+            fudoTotalSalesAmount={data.grandTotals.totalGrossAmount}
+          />
 
           {/* GRÁFICO EVOLUTIVO DE VENTAS BRUTAS */}
           <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-4 shadow-xl">

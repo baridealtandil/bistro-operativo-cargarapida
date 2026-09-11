@@ -25,6 +25,7 @@ import {
   Check
 } from 'lucide-react';
 import { DateRangePicker } from './DateRangePicker';
+import { MpFudoReconciliationBoard } from './MpFudoReconciliationBoard';
 
 interface MercadoPagoReconciliationViewProps {
   startDate?: string;
@@ -430,6 +431,12 @@ export default function MercadoPagoReconciliationView({
         </div>
 
       </div>
+
+      {/* TABLERO DE CONCILIACIÓN FUDO MP ↔ MERCADO PAGO API */}
+      <MpFudoReconciliationBoard
+        startDate={startDate}
+        endDate={endDate}
+      />
 
       {/* Main Table & Filters */}
       <div className="bg-slate-900 rounded-2xl border border-slate-800 p-6 space-y-4 shadow-xl">
