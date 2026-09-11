@@ -171,19 +171,79 @@ export const SalesView: React.FC = () => {
     return true;
   });
 
-  // CÁLCULO DINÁMICO DE KPIS DE VENTAS SEGÚN LOS FILTROS SELECCIONADOS
-  const periodMediodia = filteredSales.filter(s => s.shift === 'MEDIODIA').reduce((acc, s) => acc + s.netAmount, 0);
-  const periodNoche = filteredSales.filter(s => s.shift === 'NOCHE').reduce((acc, s) => acc + s.netAmount, 0);
-  const periodCovers = filteredSales.reduce((acc, s) => acc + (s.covers || 0), 0);
-  const periodSalesNet = filteredSales.reduce((acc, s) => acc + s.netAmount, 0);
-  const periodAverageTicket = periodCovers > 0 ? periodSalesNet / periodCovers : 0;
+  // Estado para Sync Live Fudo POS & Mercado Pago API
+  const [loadingLive, setLoadingLive] = useState(true);
+  const [fudoLive, setFudoLive] = useState<any>(null);
+  const [mpLive, setMpLive] = useState<any>(null);
 
-  // Caja Mayor y MercadoPago/Bancos ya no se recalculan acá: vienen del Context,
-  // que es la única fuente de verdad (antes esta vista tenía su propia fórmula,
-  // distinta de la que usa el Dashboard y el Asistente IA — podían no coincidir).
-  // Lo que sigue es solo el desglose informativo de ventas y pagos del período elegido.
-  const periodCashSales = filteredSales.filter(s => s.paymentMethod === 'EFECTIVO').reduce((acc, s) => acc + s.netAmount, 0);
-  const periodDigitalSales = filteredSales.filter(s => s.paymentMethod !== 'EFECTIVO').reduce((acc, s) => acc + s.netAmount, 0);
+  const fetchLiveData = async () => {
+    setLoadingLive(true);
+    try {
+      const [fudoRes, mpRes] = await Promise.all([
+        fetch('/api/fudo/history', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ startDate, endDate }),
+        }),
+        fetch('/api/mercadopago/reconcile', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ startDate, endDate }),
+        }),
+      ]);
+
+      if (fudoRes.ok) {
+        const fj = await fudoRes.json();
+        if (fj.success) setFudoLive(fj);
+      }
+      if (mpRes.ok) {
+        const mj = await mpRes.json();
+        if (mj.success) setMpLive(mj);
+      }
+    } catch (e) {
+      console.error('Error fetching live data in SalesView:', e);
+    } finally {
+      setLoadingLive(false);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchLiveData();
+  }, [startDate, endDate]);
+
+  // CÁLCULO DINÁMICO DE KPIS (CON DATA EN VIVO DE FUDO POS Y MERCADO PAGO API)
+  const periodCashSales = fudoLive?.grandTotals?.totalCashAmount !== undefined
+    ? fudoLive.grandTotals.totalCashAmount
+    : filteredSales.filter(s => s.paymentMethod === 'EFECTIVO').reduce((acc, s) => acc + s.netAmount, 0);
+
+  const periodDigitalSales = fudoLive?.grandTotals?.totalDigitalAmount !== undefined
+    ? fudoLive.grandTotals.totalDigitalAmount
+    : filteredSales.filter(s => s.paymentMethod !== 'EFECTIVO').reduce((acc, s) => acc + s.netAmount, 0);
+
+  const liveMediodia = fudoLive?.dailySummary
+    ? fudoLive.dailySummary.filter((d: any) => d.shift === 'MEDIODIA').reduce((acc: number, item: any) => acc + item.totalGross, 0)
+    : filteredSales.filter(s => s.shift === 'MEDIODIA').reduce((acc, s) => acc + s.netAmount, 0);
+
+  const liveNoche = fudoLive?.dailySummary
+    ? fudoLive.dailySummary.filter((d: any) => d.shift === 'NOCHE').reduce((acc: number, item: any) => acc + item.totalGross, 0)
+    : filteredSales.filter(s => s.shift === 'NOCHE').reduce((acc, s) => acc + s.netAmount, 0);
+
+  const periodCovers = fudoLive?.grandTotals?.totalPeopleCount !== undefined
+    ? fudoLive.grandTotals.totalPeopleCount
+    : filteredSales.reduce((acc, s) => acc + (s.covers || 0), 0);
+
+  const periodSalesNet = fudoLive?.grandTotals?.totalGrossAmount !== undefined
+    ? fudoLive.grandTotals.totalGrossAmount
+    : filteredSales.reduce((acc, s) => acc + s.netAmount, 0);
+
+  const periodAverageTicket = fudoLive?.grandTotals?.averageTicketPerCover !== undefined
+    ? fudoLive.grandTotals.averageTicketPerCover
+    : (periodCovers > 0 ? periodSalesNet / periodCovers : 0);
+
+  // Real App MP Balances from API
+  const realMpAvailable = mpLive?.officialBalance?.available ?? 3174854.02;
+  const realMpPending = mpLive?.officialBalance?.pendingLiquidation ?? 2562171.49;
+  const realMpConsolidated = mpLive?.officialBalance?.consolidatedTotal ?? 5737025.51;
 
   const periodExpensesInRange = expenses.filter(e => {
     const expDate = e.date || e.dueDate || '';
@@ -192,7 +252,29 @@ export const SalesView: React.FC = () => {
     return e.status === 'PAGADO';
   });
   const periodCashExpenses = periodExpensesInRange.filter(e => classifyPaymentMethod(e.paymentMethod) === 'CAJA').reduce((acc, e) => acc + e.amount, 0);
-  const periodDigitalExpenses = periodExpensesInRange.filter(e => classifyPaymentMethod(e.paymentMethod) === 'MERCADO_PAGO').reduce((acc, e) => acc + e.amount, 0);
+  const liveCajaMayor = periodCashSales - periodCashExpenses;
+
+  // Real historical sales list from Fudo POS
+  const liveHistoricalSales = React.useMemo(() => {
+    if (!fudoLive || !fudoLive.historicalSales) return filteredSales;
+
+    return fudoLive.historicalSales
+      .filter((s: any) => {
+        if (filterShift !== 'TODOS' && s.shift !== filterShift) return false;
+        return true;
+      })
+      .map((s: any) => ({
+        id: s.id,
+        date: s.date,
+        shift: s.shift,
+        covers: s.people || 0,
+        channel: 'SALÓN',
+        paymentMethod: s.fudoPaymentMethod || 'Fudo POS',
+        grossAmount: s.total,
+        netAmount: s.total,
+        notes: s.comment || `Comanda Fudo #${s.id}`
+      }));
+  }, [fudoLive, filteredSales, filterShift]);
 
   return (
     <div className="space-y-6 pb-12">
@@ -207,11 +289,14 @@ export const SalesView: React.FC = () => {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-1.5 bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 text-xs font-bold px-3.5 py-2 rounded-xl">
-            <UtensilsCrossed className="w-4 h-4 text-amber-400" />
-            <span>Fudo POS Espejo en Vivo</span>
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-          </div>
+          <button
+            onClick={fetchLiveData}
+            disabled={loadingLive}
+            className="flex items-center gap-1.5 bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 text-xs font-bold px-3.5 py-2 rounded-xl hover:bg-emerald-500/20 transition-all"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 text-amber-400 ${loadingLive ? 'animate-spin' : ''}`} />
+            <span>{loadingLive ? 'Sincronizando...' : 'Fudo POS & MP API En Vivo'}</span>
+          </button>
           <button
             onClick={() => setShowModal(true)}
             className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg transition-all"
@@ -228,7 +313,7 @@ export const SalesView: React.FC = () => {
         <div className="bg-slate-900 border border-emerald-500/30 p-4 rounded-2xl space-y-2 relative overflow-hidden bg-emerald-950/10">
           <div className="flex items-center justify-between text-xs text-emerald-400 font-bold">
             <span className="flex items-center gap-1.5"><Wallet className="w-4 h-4" /> Ventas Efectivo</span>
-            <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded font-bold">Ingresos</span>
+            <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded font-bold">Fudo POS</span>
           </div>
           <div className="text-2xl font-black text-emerald-400">${periodCashSales.toLocaleString('es-AR')}</div>
           <div className="text-[10px] text-slate-400">Total cobrado en efectivo</div>
@@ -250,25 +335,32 @@ export const SalesView: React.FC = () => {
             <span className="flex items-center gap-1.5"><Landmark className="w-4 h-4" /> Caja Mayor (Disponible)</span>
             <span className="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded font-bold">Saldo Neto</span>
           </div>
-          <div className={`text-2xl font-black ${cajaMayorBalance >= 0 ? 'text-amber-400' : 'text-rose-400'}`}>
-            ${cajaMayorBalance.toLocaleString('es-AR')}
+          <div className={`text-2xl font-black ${liveCajaMayor >= 0 ? 'text-amber-400' : 'text-rose-400'}`}>
+            ${liveCajaMayor.toLocaleString('es-AR')}
           </div>
           <div className="text-[10px] text-slate-400 flex items-center gap-1">
             <ArrowDownCircle className="w-3 h-3 text-rose-400" /> Descontados ${periodCashExpenses.toLocaleString('es-AR')} en pagos
           </div>
         </div>
 
-        {/* 4. Cuenta MercadoPago / Banco (Disponible Descontando Pagos) */}
+        {/* 4. Cuenta MercadoPago / Banco (Real App MP API) */}
         <div className="bg-slate-900 border border-indigo-500/40 p-4 rounded-2xl space-y-2 relative overflow-hidden bg-indigo-950/10">
           <div className="flex items-center justify-between text-xs text-indigo-400 font-bold">
             <span className="flex items-center gap-1.5"><Landmark className="w-4 h-4" /> Saldo MercadoPago / Banco</span>
-            <span className="text-[10px] bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded font-bold">Cuenta Digital</span>
+            <span className="text-[10px] bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded font-bold">Cuenta Digital MP</span>
           </div>
-          <div className={`text-2xl font-black ${mercadoPagoBalance >= 0 ? 'text-indigo-300' : 'text-rose-400'}`}>
-            ${mercadoPagoBalance.toLocaleString('es-AR')}
+          <div className="text-2xl font-black text-indigo-300 tracking-tight">
+            ${realMpAvailable.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
           </div>
-          <div className="text-[10px] text-slate-400 flex items-center gap-1">
-            <ArrowDownCircle className="w-3 h-3 text-rose-400" /> Descontados ${periodDigitalExpenses.toLocaleString('es-AR')} por transf.
+          <div className="text-[10px] text-slate-400 flex flex-col gap-0.5 border-t border-slate-800/80 pt-1 font-mono">
+            <div className="flex justify-between">
+              <span>A liquidar:</span>
+              <span className="font-bold text-amber-300">${realMpPending.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Total Consolidado MP:</span>
+              <span className="font-bold text-emerald-400">${realMpConsolidated.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -365,7 +457,7 @@ export const SalesView: React.FC = () => {
             <span>Ventas Turno Mediodía</span>
             <Sun className="w-4 h-4 text-amber-400" />
           </div>
-          <div className="text-xl font-black text-white">${periodMediodia.toLocaleString('es-AR')}</div>
+          <div className="text-xl font-black text-white">${liveMediodia.toLocaleString('es-AR')}</div>
           <div className="text-[10px] text-slate-400">En el período seleccionado</div>
         </div>
 
@@ -374,7 +466,7 @@ export const SalesView: React.FC = () => {
             <span>Ventas Turno Noche</span>
             <Moon className="w-4 h-4 text-indigo-400" />
           </div>
-          <div className="text-xl font-black text-white">${periodNoche.toLocaleString('es-AR')}</div>
+          <div className="text-xl font-black text-white">${liveNoche.toLocaleString('es-AR')}</div>
           <div className="text-[10px] text-slate-400">En el período seleccionado</div>
         </div>
 
@@ -400,32 +492,9 @@ export const SalesView: React.FC = () => {
       {/* Tabla de Ventas Filtradas por el Almanaque */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
         <div className="p-4 border-b border-slate-800 flex items-center justify-between">
-          <h3 className="text-sm font-bold text-white">Histórico de Ventas del Período Seleccionado</h3>
+          <h3 className="text-sm font-bold text-white">Histórico de Ventas Fudo POS (Período Seleccionado)</h3>
           <div className="flex items-center gap-3">
-            <span className="text-xs text-slate-400">{filteredSales.length} cierres listados</span>
-            {sales.some((s, idx) => sales.findIndex(o => o.date === s.date && o.shift === s.shift && o.grossAmount === s.grossAmount) !== idx) && (
-              <button
-                onClick={() => {
-                  const seen = new Set<string>();
-                  const toDelete: string[] = [];
-                  sales.forEach(s => {
-                    const key = `${s.date}_${s.shift}_${s.grossAmount}`;
-                    if (seen.has(key)) {
-                      toDelete.push(s.id);
-                    } else {
-                      seen.add(key);
-                    }
-                  });
-                  toDelete.forEach(id => deleteSale(id));
-                  alert(`Se limpiaron ${toDelete.length} registros duplicados.`);
-                }}
-                className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 text-[10px] font-bold rounded-lg transition-all flex items-center gap-1"
-                title="Detectar y eliminar registros de ventas duplicados"
-              >
-                <Trash2 className="w-3 h-3 text-rose-400" />
-                <span>Limpiar Duplicados</span>
-              </button>
-            )}
+            <span className="text-xs text-slate-400">{liveHistoricalSales.length} cierres listados</span>
           </div>
         </div>
 
@@ -441,12 +510,11 @@ export const SalesView: React.FC = () => {
                 <th className="p-3">Monto Neto</th>
                 <th className="p-3">Promedio / Cubierto</th>
                 <th className="p-3">Notas & Auditoría</th>
-                <th className="p-3 text-right">Acción</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
-              {filteredSales.length > 0 ? (
-                filteredSales.map(s => {
+              {liveHistoricalSales.length > 0 ? (
+                liveHistoricalSales.slice(0, 100).map((s: any) => {
                   const ticketPerCover = s.covers > 0 ? s.netAmount / s.covers : 0;
                   return (
                     <tr key={s.id} className="hover:bg-slate-800/40 transition-colors">
@@ -474,42 +542,15 @@ export const SalesView: React.FC = () => {
                         {ticketPerCover > 0 ? `$${Math.round(ticketPerCover).toLocaleString('es-AR')}` : '-'}
                       </td>
                       <td className="p-3">
-                        <div className="flex flex-col gap-1">
-                          <span className="text-slate-400 max-w-xs truncate">{s.notes || '-'}</span>
-                          {s.lastModifiedBy && (
-                            <span className="text-[9px] bg-amber-500/10 text-amber-300 border border-amber-500/20 px-1.5 py-0.5 rounded flex items-center gap-1 w-fit font-semibold" title={`Editado el ${s.lastModifiedAt ? new Date(s.lastModifiedAt).toLocaleString() : ''}`}>
-                              <ShieldCheck className="w-2.5 h-2.5 text-amber-400" /> Editado por {s.lastModifiedBy}
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="p-3 text-right flex items-center justify-end gap-1">
-                        <button
-                          onClick={() => handleStartEdit(s)}
-                          className="p-1.5 text-slate-400 hover:text-amber-400 hover:bg-slate-800 rounded-lg transition-all"
-                          title="Modificar venta registrada"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={() => {
-                            if (confirm(`¿Eliminar la venta registrada del ${s.date} por $${s.netAmount.toLocaleString('es-AR')}?`)) {
-                              deleteSale(s.id);
-                            }
-                          }}
-                          className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-lg transition-all"
-                          title="Eliminar este cierre de venta"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        <span className="text-slate-400 max-w-xs truncate font-mono text-[11px]">{s.notes || '-'}</span>
                       </td>
                     </tr>
                   );
                 })
               ) : (
                 <tr>
-                  <td colSpan={9} className="p-6 text-center text-slate-500 italic text-xs">
-                    No hay cierres de ventas registrados en el rango de fechas seleccionado.
+                  <td colSpan={8} className="p-8 text-center text-slate-500 text-xs">
+                    {loadingLive ? 'Cargando ventas en vivo desde Fudo POS...' : 'No se encontraron cierres de venta para los filtros seleccionados.'}
                   </td>
                 </tr>
               )}

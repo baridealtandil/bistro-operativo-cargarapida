@@ -380,18 +380,20 @@ export default function MercadoPagoReconciliationView({
           </div>
 
           <div>
-            <div className="text-2xl font-black text-rose-400">
+            <div className="text-lg sm:text-xl xl:text-2xl font-black text-rose-400 tracking-tight truncate" title={`-$${totalConsolidatedEgresos.toLocaleString('es-AR')}`}>
               -${totalConsolidatedEgresos.toLocaleString('es-AR')}
             </div>
             
             <div className="mt-1 space-y-1 text-[11px]">
-              <div className="flex justify-between text-slate-400">
-                <span>Vía API MP:</span>
-                <span className="font-semibold text-rose-300">-${apiEgresos.toLocaleString('es-AR')}</span>
+              <div className="flex justify-between items-center text-slate-400 gap-1">
+                <span className="shrink-0">Vía API MP:</span>
+                <span className="font-semibold text-rose-300 font-mono truncate" title={`-$${apiEgresos.toLocaleString('es-AR')}`}>
+                  -${apiEgresos.toLocaleString('es-AR')}
+                </span>
               </div>
 
-              <div className="flex justify-between items-center text-slate-400">
-                <span className="flex items-center gap-1">
+              <div className="flex justify-between items-center text-slate-400 gap-1">
+                <span className="flex items-center gap-1 shrink-0">
                   CBU / App MP:
                   <button
                     onClick={() => setIsEditingManualEgresos(!isEditingManualEgresos)}
@@ -417,7 +419,7 @@ export default function MercadoPagoReconciliationView({
                     </button>
                   </div>
                 ) : (
-                  <span className="font-semibold text-amber-400">
+                  <span className="font-semibold text-amber-400 font-mono truncate">
                     -${manualEgresos.toLocaleString('es-AR')}
                   </span>
                 )}
