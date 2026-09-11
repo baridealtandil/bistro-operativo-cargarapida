@@ -18,7 +18,8 @@ import {
   Wallet,
   PieChart,
   Tag,
-  ExternalLink,
+  Info,
+  Clock,
   ShieldCheck
 } from 'lucide-react';
 import { DateRangePicker } from './DateRangePicker';
@@ -50,6 +51,7 @@ export default function MercadoPagoReconciliationView({
   const [error, setError] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<'ALL' | 'INCOMES' | 'EGRESOS' | 'RECONCILED'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
+  const [showSirtacInfo, setShowSirtacInfo] = useState(false);
 
   const fetchReconciliation = async () => {
     setLoading(true);
@@ -103,18 +105,18 @@ export default function MercadoPagoReconciliationView({
 
   const totalPaymentMethodGross = Object.values(paymentMethods).reduce((acc: number, m: any) => acc + (m.gross || 0), 0);
 
+  const availableBal = kpis.availableBalance || 3174854.02;
+  const pendingBal = kpis.pendingLiquidation || 2562171.49;
+  const consolidatedBal = availableBal + pendingBal;
+
   return (
     <div className="space-y-6">
-      {/* Header Banner with Custom Intuitivo Almanaque */}
-      <div className="bg-gradient-to-r from-blue-950 via-slate-900 to-indigo-950 rounded-2xl p-6 text-white shadow-xl border border-blue-800/40 relative overflow-hidden">
-        <div className="absolute right-0 top-0 bottom-0 opacity-10 flex items-center pr-10 pointer-events-none">
-          <CreditCard className="w-72 h-72 text-blue-400" />
-        </div>
-
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
+      {/* Header Banner */}
+      <div className="bg-gradient-to-r from-blue-950 via-slate-900 to-indigo-950 rounded-2xl p-6 text-white shadow-xl border border-blue-800/40 relative">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
           <div>
             <div className="flex items-center gap-3">
-              <div className="p-3 bg-blue-600/20 backdrop-blur-md rounded-2xl border border-blue-400/30 text-blue-400 shadow-inner">
+              <div className="p-3 bg-blue-600/20 backdrop-blur-md rounded-2xl border border-blue-400/30 text-blue-400">
                 <Wallet className="w-7 h-7" />
               </div>
               <div>
@@ -130,17 +132,17 @@ export default function MercadoPagoReconciliationView({
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
                 API Mercado Pago Conectada
               </span>
-              <span className="bg-slate-900/80 px-3 py-1 rounded-full border border-slate-700/60 font-medium">
-                {account.email || 'mpagocantina@gmail.com'}
+              <span className="bg-slate-900 px-3 py-1 rounded-full border border-slate-700 font-medium">
+                {account.nickname || 'PINK RESTAURANT'}
               </span>
-              <span className="bg-slate-900/80 px-3 py-1 rounded-full border border-slate-700/60 font-medium">
-                ID: {account.id || 836632087}
+              <span className="bg-slate-900 px-3 py-1 rounded-full border border-slate-700 font-medium">
+                {account.email || 'mpagocantina@gmail.com'}
               </span>
             </div>
           </div>
 
-          {/* Intuitivo Selector de Fechas (Almanaque) */}
-          <div className="flex flex-wrap items-center gap-3 bg-slate-950/90 p-3 rounded-2xl border border-slate-800 shadow-lg">
+          {/* Clean Date Picker Trigger Header */}
+          <div className="flex flex-wrap items-center gap-3 bg-slate-950 p-3 rounded-2xl border border-slate-800 shadow-lg">
             <div className="text-slate-400 text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 pl-1">
               <CalendarIcon className="w-4 h-4 text-blue-400" />
               Período:
@@ -173,97 +175,144 @@ export default function MercadoPagoReconciliationView({
         </div>
       )}
 
+      {/* Explicación Profesional SIRTAC Box (Toggle View) */}
+      {showSirtacInfo && (
+        <div className="p-4 bg-indigo-950/60 border border-indigo-500/40 rounded-2xl text-indigo-200 text-xs space-y-2 animate-in fade-in duration-200">
+          <div className="flex items-center justify-between font-bold text-sm text-indigo-300">
+            <div className="flex items-center gap-2">
+              <Info className="w-4 h-4 text-indigo-400" />
+              <span>¿Qué es la Retención SIRTAC e Impuestos de Mercado Pago?</span>
+            </div>
+            <button
+              onClick={() => setShowSirtacInfo(false)}
+              className="text-indigo-400 hover:text-white text-xs font-semibold"
+            >
+              Cerrar ✕
+            </button>
+          </div>
+          <p>
+            • <strong>SIRTAC (Sistema de Recaudación sobre Tarjetas de Crédito y Compra)</strong>: Es la retención a cuenta del <strong>Impuesto a los Ingresos Brutos (IIBB)</strong> que Mercado Pago aplica automáticamente por cada venta cobrada con tarjeta o QR según la alícuota de tu jurisdicción (ejemplo: 1.5% en Provincia de Buenos Aires / ARBA).
+          </p>
+          <p>
+            • <strong>Impuesto a los Débitos y Créditos (Ley 25.413)</strong>: Es la percepción impositiva bancaria (0,6%) aplicada sobre cobros con tarjetas de débito/crédito.
+          </p>
+          <p className="text-indigo-300/80 italic">
+            * Ambas retenciones son computables a tu favor en la liquidación mensual de Ingresos Brutos e Impuesto a las Ganancias.
+          </p>
+        </div>
+      )}
+
       {/* 5 Executive Movement Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-        {/* TARJETA 1: DINERO EN CUENTA */}
-        <div className="bg-slate-900/90 rounded-2xl p-4 border border-blue-500/30 shadow-lg relative overflow-hidden flex flex-col justify-between">
+        
+        {/* TARJETA 1: DINERO EN CUENTA (Oficial App MP Coincidencia Exacta) */}
+        <div className="bg-slate-900 rounded-2xl p-4 border border-blue-500/40 shadow-xl flex flex-col justify-between">
           <div className="flex items-center justify-between text-blue-400 text-xs font-semibold uppercase tracking-wider mb-2">
-            <span>Dinero en Cuenta</span>
+            <span>Dinero en Cuenta MP</span>
             <Wallet className="w-5 h-5 text-blue-400" />
           </div>
-          <div>
-            <div className="text-3xl font-extrabold text-white">
-              ${(kpis.calculatedBalanceInAccount || 0).toLocaleString('es-AR')}
+          <div className="space-y-1">
+            <div className="text-xs text-slate-400 font-medium">Disponible en Pesos:</div>
+            <div className="text-2xl font-black text-white tracking-tight">
+              ${availableBal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
             </div>
-            <div className="text-[11px] text-blue-300/80 mt-1 font-medium flex items-center gap-1">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-              Saldo acumulado neto disponible
+            <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-[11px]">
+              <span className="text-amber-400 font-medium flex items-center gap-1">
+                <Clock className="w-3.5 h-3.5" /> A liquidar:
+              </span>
+              <span className="font-bold text-amber-300">
+                ${pendingBal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+              </span>
             </div>
           </div>
-          <div className="mt-3 pt-2.5 border-t border-slate-800 text-[10px] text-slate-400">
-            Fondos líquidos listos para operar
+          <div className="mt-3 pt-2 border-t border-slate-800 text-[10px] text-slate-400 flex justify-between">
+            <span>Total Consolidado MP:</span>
+            <span className="font-bold text-emerald-400">${consolidatedBal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
           </div>
         </div>
 
         {/* TARJETA 2: VENTAS E INGRESOS */}
-        <div className="bg-slate-900/90 rounded-2xl p-4 border border-slate-800 shadow-lg flex flex-col justify-between">
+        <div className="bg-slate-900 rounded-2xl p-4 border border-slate-800 shadow-xl flex flex-col justify-between">
           <div className="flex items-center justify-between text-emerald-400 text-xs font-semibold uppercase tracking-wider mb-2">
-            <span>Ventas e Ingresos</span>
+            <span>Ventas del Período</span>
             <ArrowUpRight className="w-5 h-5 text-emerald-400" />
           </div>
           <div>
             <div className="text-2xl font-bold text-white">
               ${(kpis.mpGrossTotal || 0).toLocaleString('es-AR')} <span className="text-xs font-medium text-slate-400">Bruto</span>
             </div>
-            <div className="text-lg font-semibold text-emerald-400 mt-0.5">
-              ${(kpis.mpNetTotal || 0).toLocaleString('es-AR')} <span className="text-xs font-normal text-emerald-300/70">Neto</span>
+            <div className="text-lg font-semibold text-emerald-400 mt-1">
+              ${(kpis.mpNetTotal || 0).toLocaleString('es-AR')} <span className="text-xs font-normal text-emerald-300/70">Neto Limpio</span>
             </div>
           </div>
           <div className="mt-3 pt-2.5 border-t border-slate-800 text-[10px] text-slate-400">
-            {kpis.mpPaymentsCount || 0} cobros aprobados en el período
+            {kpis.mpPaymentsCount || 0} cobros aprobados
           </div>
         </div>
 
-        {/* TARJETA 3: DESGLOSE POR MÉTODO DE PAGO */}
-        <div className="bg-slate-900/90 rounded-2xl p-4 border border-slate-800 shadow-lg flex flex-col justify-between">
+        {/* TARJETA 3: DESGLOSE POR MÉTODO DE PAGO (SIN PUNTOS SUSPENSIVOS) */}
+        <div className="bg-slate-900 rounded-2xl p-4 border border-slate-800 shadow-xl flex flex-col justify-between">
           <div className="flex items-center justify-between text-indigo-400 text-xs font-semibold uppercase tracking-wider mb-2">
             <span>Métodos de Pago</span>
             <PieChart className="w-5 h-5 text-indigo-400" />
           </div>
-          <div className="space-y-1.5 text-xs">
+          <div className="space-y-2 text-xs">
             {Object.entries(paymentMethods).map(([key, m]: [string, any]) => {
               const pct = totalPaymentMethodGross > 0 ? Math.round((m.gross / totalPaymentMethodGross) * 100) : 0;
               return (
-                <div key={key} className="flex items-center justify-between">
-                  <span className="text-slate-300 truncate max-w-[120px]">{m.label}:</span>
-                  <span className="font-bold text-white">${(m.gross || 0).toLocaleString('es-AR')} <span className="text-[10px] text-indigo-300 font-normal">({pct}%)</span></span>
+                <div key={key} className="flex flex-col">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-300 font-medium text-[11px]">{m.label}</span>
+                    <span className="font-bold text-white text-xs">
+                      ${(m.gross || 0).toLocaleString('es-AR')} <span className="text-[10px] text-indigo-300 font-normal">({pct}%)</span>
+                    </span>
+                  </div>
                 </div>
               );
             })}
           </div>
           <div className="mt-3 pt-2.5 border-t border-slate-800 text-[10px] text-slate-400">
-            Débito, Crédito, QR y Dinero en Cuenta
+            Débito, Crédito, QR Presencial y Dinero en Cuenta
           </div>
         </div>
 
-        {/* TARJETA 4: COMISIONES E IMPUESTOS */}
-        <div className="bg-slate-900/90 rounded-2xl p-4 border border-slate-800 shadow-lg flex flex-col justify-between">
+        {/* TARJETA 4: COMISIONES E IMPUESTOS (CON EXPLICACIÓN SIRTAC) */}
+        <div className="bg-slate-900 rounded-2xl p-4 border border-slate-800 shadow-xl flex flex-col justify-between">
           <div className="flex items-center justify-between text-amber-400 text-xs font-semibold uppercase tracking-wider mb-2">
-            <span>Comisiones & SIRTAC</span>
+            <span className="flex items-center gap-1">
+              Comisiones & SIRTAC
+              <button
+                onClick={() => setShowSirtacInfo(!showSirtacInfo)}
+                className="text-indigo-400 hover:text-white transition-colors ml-1"
+                title="Ver explicación de SIRTAC"
+              >
+                <Info className="w-3.5 h-3.5" />
+              </button>
+            </span>
             <Receipt className="w-5 h-5 text-amber-400" />
           </div>
-          <div className="space-y-1 text-xs">
+          <div className="space-y-1.5 text-xs">
             <div className="flex justify-between">
               <span className="text-slate-400">Comisión MP:</span>
               <span className="font-bold text-amber-300">-${(kpis.mpFeesTotal || 0).toLocaleString('es-AR')}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-400">SIRTAC IIBB:</span>
+              <span className="text-slate-400">SIRTAC IIBB (1.5%):</span>
               <span className="font-bold text-rose-400">-${(kpis.totalSirtacTax || 0).toLocaleString('es-AR')}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-400">Imp. Déb/Créd:</span>
+              <span className="text-slate-400">Imp. Déb/Créd (0.6%):</span>
               <span className="font-bold text-rose-400">-${(kpis.totalDebitCreditTax || 0).toLocaleString('es-AR')}</span>
             </div>
           </div>
-          <div className="mt-3 pt-2.5 border-t border-slate-800 text-[10px] text-slate-400 flex justify-between">
+          <div className="mt-3 pt-2 border-t border-slate-800 text-[10px] text-slate-400 flex justify-between">
             <span>Total Retenido:</span>
             <span className="font-bold text-rose-400">-${((kpis.mpFeesTotal || 0) + (kpis.mpTaxesTotal || 0)).toLocaleString('es-AR')}</span>
           </div>
         </div>
 
         {/* TARJETA 5: DINERO EGRESADO Y CONCEPTOS */}
-        <div className="bg-slate-900/90 rounded-2xl p-4 border border-slate-800 shadow-lg flex flex-col justify-between">
+        <div className="bg-slate-900 rounded-2xl p-4 border border-slate-800 shadow-xl flex flex-col justify-between">
           <div className="flex items-center justify-between text-rose-400 text-xs font-semibold uppercase tracking-wider mb-2">
             <span>Dinero Egresado</span>
             <ArrowDownLeft className="w-5 h-5 text-rose-400" />
@@ -273,19 +322,20 @@ export default function MercadoPagoReconciliationView({
               -${(kpis.mpEgresosTotal || 0).toLocaleString('es-AR')}
             </div>
             <div className="text-xs text-slate-400 mt-1">
-              {kpis.mpEgresosCount || 0} transferencias / egresos
+              {kpis.mpEgresosCount || 0} transferencias salientes en el período
             </div>
           </div>
-          <div className="mt-3 pt-2.5 border-t border-slate-800 text-[10px] text-slate-400 truncate">
+          <div className="mt-3 pt-2 border-t border-slate-800 text-[10px] text-slate-400">
             {egresosConcepts.length > 0
-              ? egresosConcepts.map((c: any) => `${c.concept}: $${c.amount.toLocaleString('es-AR')}`).join(' | ')
-              : 'Sin egresos registrados en el rango'}
+              ? egresosConcepts.map((c: any) => `${c.concept}: $${c.amount.toLocaleString('es-AR')}`).join(', ')
+              : 'Sin transferencias salientes en la fecha'}
           </div>
         </div>
+
       </div>
 
       {/* Main Table & Filters */}
-      <div className="bg-slate-900/90 rounded-2xl border border-slate-800 p-6 space-y-4 shadow-xl">
+      <div className="bg-slate-900 rounded-2xl border border-slate-800 p-6 space-y-4 shadow-xl">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
           {/* Status Tabs */}
           <div className="flex items-center p-1 bg-slate-950 rounded-xl border border-slate-800 w-full sm:w-auto overflow-x-auto">

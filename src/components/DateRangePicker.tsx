@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Check, X, RotateCcw } from 'lucide-react';
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Check, RotateCcw, X } from 'lucide-react';
 
 interface DateRangePickerProps {
   startDate: string;
@@ -129,13 +129,6 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
       setTempStart(first);
       setTempEnd(last);
       onChange(first, last);
-    } else if (presetKey === '30DIAS') {
-      const d = new Date(today);
-      d.setDate(d.getDate() - 29);
-      const s = formatDateStr(d.getFullYear(), d.getMonth(), d.getDate());
-      setTempStart(s);
-      setTempEnd(todayStr);
-      onChange(s, todayStr);
     } else if (presetKey === 'TODO') {
       setTempStart('');
       setTempEnd('');
@@ -153,19 +146,19 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
   ];
 
   return (
-    <div className={`relative ${className}`} ref={containerRef}>
-      {/* Redesigned Trigger Button */}
+    <div className={`relative inline-block ${className}`} ref={containerRef}>
+      {/* Clean Trigger Button */}
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="bg-slate-950/90 hover:bg-slate-900 border border-slate-800 hover:border-blue-500/50 rounded-xl px-3.5 py-2 text-xs font-semibold text-slate-100 flex items-center gap-2.5 transition-all shadow-sm group"
+        className="bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-blue-500/60 rounded-xl px-4 py-2 text-xs font-semibold text-white flex items-center gap-2.5 transition-all shadow-md group"
       >
         <CalendarIcon className="w-4 h-4 text-blue-400 group-hover:scale-110 transition-transform shrink-0" />
-        <span className="truncate">
+        <span>
           {startDate && endDate
             ? startDate === endDate
               ? `${formatDisplay(startDate)}`
-              : `${formatDisplay(startDate)} ➔ ${formatDisplay(endDate)}`
+              : `${formatDisplay(startDate)} - ${formatDisplay(endDate)}`
             : startDate
             ? `Desde: ${formatDisplay(startDate)}`
             : endDate
@@ -174,23 +167,32 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
         </span>
       </button>
 
-      {/* Popover Calendar Modal */}
+      {/* Popover Calendar Modal - Clean Positioning Below Trigger */}
       {isOpen && (
-        <div className="absolute right-0 sm:left-0 top-full mt-2 bg-slate-950 border border-slate-800 rounded-2xl shadow-2xl z-50 p-4 w-80 sm:w-96 text-slate-200 animate-in fade-in zoom-in-95 duration-150">
-          {/* Quick Presets Header */}
-          <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center justify-between">
-            <span>Accesos Rápidos</span>
-            {activePreset && <span className="text-blue-400 font-semibold">{activePreset}</span>}
+        <div className="absolute right-0 sm:left-0 top-full mt-2.5 bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl z-50 p-4 w-80 sm:w-96 text-slate-100 ring-1 ring-slate-800">
+          {/* Header */}
+          <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-300">
+              Seleccionar Fecha
+            </span>
+            <button
+              type="button"
+              onClick={() => setIsOpen(false)}
+              className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
 
-          <div className="grid grid-cols-3 gap-1.5 pb-3 border-b border-slate-800">
+          {/* Presets Grid */}
+          <div className="grid grid-cols-3 gap-1.5 py-3 border-b border-slate-800">
             <button
               type="button"
               onClick={() => applyPreset('HOY')}
               className={`text-xs py-1.5 rounded-lg font-medium border transition-colors ${
                 activePreset === 'HOY'
                   ? 'bg-blue-600 border-blue-500 text-white font-bold'
-                  : 'bg-slate-900 border-slate-800 text-slate-300 hover:bg-blue-900/30 hover:text-blue-300'
+                  : 'bg-slate-950 border-slate-800 text-slate-300 hover:bg-blue-900/30 hover:text-blue-300'
               }`}
             >
               Hoy
@@ -201,7 +203,7 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
               className={`text-xs py-1.5 rounded-lg font-medium border transition-colors ${
                 activePreset === 'AYER'
                   ? 'bg-blue-600 border-blue-500 text-white font-bold'
-                  : 'bg-slate-900 border-slate-800 text-slate-300 hover:bg-blue-900/30 hover:text-blue-300'
+                  : 'bg-slate-950 border-slate-800 text-slate-300 hover:bg-blue-900/30 hover:text-blue-300'
               }`}
             >
               Ayer
@@ -212,7 +214,7 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
               className={`text-xs py-1.5 rounded-lg font-medium border transition-colors ${
                 activePreset === '7DIAS'
                   ? 'bg-blue-600 border-blue-500 text-white font-bold'
-                  : 'bg-slate-900 border-slate-800 text-slate-300 hover:bg-blue-900/30 hover:text-blue-300'
+                  : 'bg-slate-950 border-slate-800 text-slate-300 hover:bg-blue-900/30 hover:text-blue-300'
               }`}
             >
               Últimos 7 días
@@ -223,7 +225,7 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
               className={`text-xs py-1.5 rounded-lg font-medium border transition-colors ${
                 activePreset === 'ESTEMES'
                   ? 'bg-blue-600 border-blue-500 text-white font-bold'
-                  : 'bg-slate-900 border-slate-800 text-slate-300 hover:bg-blue-900/30 hover:text-blue-300'
+                  : 'bg-slate-950 border-slate-800 text-slate-300 hover:bg-blue-900/30 hover:text-blue-300'
               }`}
             >
               Este Mes
@@ -234,7 +236,7 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
               className={`text-xs py-1.5 rounded-lg font-medium border transition-colors ${
                 activePreset === 'MESPASADO'
                   ? 'bg-blue-600 border-blue-500 text-white font-bold'
-                  : 'bg-slate-900 border-slate-800 text-slate-300 hover:bg-blue-900/30 hover:text-blue-300'
+                  : 'bg-slate-950 border-slate-800 text-slate-300 hover:bg-blue-900/30 hover:text-blue-300'
               }`}
             >
               Mes Pasado
@@ -245,14 +247,14 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
               className={`text-xs py-1.5 rounded-lg font-medium border transition-colors ${
                 activePreset === 'TODO'
                   ? 'bg-blue-600 border-blue-500 text-white font-bold'
-                  : 'bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-800 hover:text-white'
+                  : 'bg-slate-950 border-slate-800 text-slate-400 hover:bg-slate-800 hover:text-white'
               }`}
             >
               Ver Todo
             </button>
           </div>
 
-          {/* Direct Date Range Inputs */}
+          {/* Direct Input Range */}
           <div className="grid grid-cols-2 gap-2 py-3 border-b border-slate-800">
             <div>
               <label className="block text-[10px] font-semibold text-slate-400 mb-1">DESDE</label>
@@ -260,7 +262,7 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
                 type="date"
                 value={tempStart}
                 onChange={(e) => setTempStart(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-blue-500"
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-blue-500"
               />
             </div>
             <div>
@@ -269,18 +271,17 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
                 type="date"
                 value={tempEnd}
                 onChange={(e) => setTempEnd(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-blue-500"
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-blue-500"
               />
             </div>
           </div>
 
-          {/* Month & Year Navigation */}
+          {/* Month Header */}
           <div className="flex items-center justify-between py-2.5 border-b border-slate-800">
             <button
               type="button"
               onClick={handlePrevMonth}
               className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors"
-              title="Mes Anterior"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
@@ -293,14 +294,13 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
               type="button"
               onClick={handleNextMonth}
               className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors"
-              title="Mes Siguiente"
             >
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>
 
           {/* Weekday headers */}
-          <div className="grid grid-cols-7 text-center text-[10px] font-bold text-slate-500 py-2">
+          <div className="grid grid-cols-7 text-center text-[10px] font-bold text-slate-400 py-2">
             <span>Dom</span>
             <span>Lun</span>
             <span>Mar</span>
@@ -310,7 +310,7 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
             <span>Sáb</span>
           </div>
 
-          {/* Calendar Days Grid */}
+          {/* Days Grid */}
           <div className="grid grid-cols-7 gap-1 text-center">
             {Array.from({ length: firstDayOfWeek }).map((_, i) => (
               <div key={`blank-${i}`} className="h-8" />
