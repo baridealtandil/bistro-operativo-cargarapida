@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { formatDateDDMMAAAA } from '../utils/formatters';
+import { DateRangePicker } from './DateRangePicker';
 import {
   TrendingUp,
   DollarSign,
@@ -432,21 +433,16 @@ export const FudoLiveDashboard: React.FC = () => {
                 <p className="text-xs text-slate-400">Busca comandas por fecha, turno, nro de orden o texto libre</p>
               </div>
 
-              {/* Custom Date Range Picker */}
-              <div className="flex flex-wrap items-center gap-2 bg-slate-950 p-2 rounded-2xl border border-slate-800">
-                <span className="text-xs text-slate-400 font-medium">Desde:</span>
-                <input
-                  type="date"
-                  value={customStart}
-                  onChange={(e) => { setCustomStart(e.target.value); setPeriod('CUSTOM'); }}
-                  className="bg-slate-900 text-white text-xs px-2.5 py-1.5 rounded-xl border border-slate-700 font-mono"
-                />
-                <span className="text-xs text-slate-400 font-medium">Hasta:</span>
-                <input
-                  type="date"
-                  value={customEnd}
-                  onChange={(e) => { setCustomEnd(e.target.value); setPeriod('CUSTOM'); }}
-                  className="bg-slate-900 text-white text-xs px-2.5 py-1.5 rounded-xl border border-slate-700 font-mono"
+              {/* Unified Single Calendar DateRangePicker */}
+              <div className="w-full sm:w-72">
+                <DateRangePicker
+                  startDate={customStart}
+                  endDate={customEnd}
+                  onChange={(start, end) => {
+                    setCustomStart(start);
+                    setCustomEnd(end);
+                    setPeriod('CUSTOM');
+                  }}
                 />
               </div>
             </div>
