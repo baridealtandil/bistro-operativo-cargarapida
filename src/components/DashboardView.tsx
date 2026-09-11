@@ -106,11 +106,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
         </div>
 
         <button
-          onClick={() => setShowFudoModal(true)}
+          onClick={() => onNavigate('fudo')}
           className="w-full sm:w-auto px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs rounded-xl shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center gap-2 active:scale-95 shrink-0"
         >
-          <RefreshCw className="w-3.5 h-3.5" />
-          <span>Sincronizar Fudo en Vivo</span>
+          <UtensilsCrossed className="w-3.5 h-3.5" />
+          <span>Ver Espejo Fudo POS En Vivo</span>
         </button>
       </div>
 

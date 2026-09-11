@@ -207,14 +207,11 @@ export const SalesView: React.FC = () => {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            onClick={() => setShowFudoModal(true)}
-            className="flex items-center gap-1.5 bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 text-amber-300 border border-amber-500/40 text-xs font-bold px-3.5 py-2.5 rounded-xl shadow-lg transition-all"
-          >
+          <div className="flex items-center gap-1.5 bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 text-xs font-bold px-3.5 py-2 rounded-xl">
             <UtensilsCrossed className="w-4 h-4 text-amber-400" />
-            <span>Sincronizar Fudo</span>
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-          </button>
+            <span>Fudo POS Espejo en Vivo</span>
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+          </div>
           <button
             onClick={() => setShowModal(true)}
             className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg transition-all"

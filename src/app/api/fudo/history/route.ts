@@ -39,26 +39,28 @@ async function getFudoToken(apiKey = DEFAULT_API_KEY, apiSecret = DEFAULT_API_SE
   return cachedToken;
 }
 
-function getShiftFromDate(isoDateString: string): 'MEDIODIA' | 'NOCHE' {
-  const date = new Date(isoDateString);
-  // Argentina is UTC-3
-  const utcHour = date.getUTCHours();
-  const artHour = (utcHour - 3 + 24) % 24;
-
-  // Mediodía: 07:00 hs a 17:59 hs
-  if (artHour >= 7 && artHour < 18) {
-    return 'MEDIODIA';
-  }
-  return 'NOCHE';
+// Convert UTC ISO timestamp to local Argentina Date (UTC-3)
+function getArgentinaDateTime(isoDateString: string): { dateStr: string; artHour: number; shift: 'MEDIODIA' | 'NOCHE' } {
+  const d = new Date(isoDateString);
+  const artMs = d.getTime() - (3 * 60 * 60 * 1000);
+  const artDate = new Date(artMs);
+  const dateStr = artDate.toISOString().split('T')[0];
+  const artHour = artDate.getUTCHours();
+  const shift = (artHour >= 7 && artHour < 18) ? 'MEDIODIA' : 'NOCHE';
+  return { dateStr, artHour, shift };
 }
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { startDate, endDate } = body; // YYYY-MM-DD
+    let { startDate, endDate } = body; // YYYY-MM-DD
+
+    const nowArt = new Date(Date.now() - 3 * 3600 * 1000);
+    const todayStr = nowArt.toISOString().split('T')[0];
 
     if (!startDate || !endDate) {
-      return NextResponse.json({ error: 'Debes especificar startDate y endDate (YYYY-MM-DD)' }, { status: 400 });
+      startDate = todayStr;
+      endDate = todayStr;
     }
 
     const token = await getFudoToken();
@@ -90,7 +92,7 @@ export async function POST(request: Request) {
       else pmPage++;
     }
 
-    // Map payments by date and shift
+    // Map payments by Argentina date and shift
     const shiftPaymentsMap: Record<string, { cash: number; digital: number }> = {};
     allPayments.forEach((p: any) => {
       const attrs = p.attributes || {};
@@ -98,8 +100,7 @@ export async function POST(request: Request) {
       const createdAt = attrs.createdAt;
       if (!createdAt) return;
 
-      const dateStr = new Date(createdAt).toISOString().split('T')[0];
-      const shift = getShiftFromDate(createdAt);
+      const { dateStr, shift } = getArgentinaDateTime(createdAt);
       const key = `${dateStr}_${shift}`;
 
       const amount = Number(attrs.amount || 0);
@@ -150,6 +151,28 @@ export async function POST(request: Request) {
       }
     }
 
+    // Individual sales records for historical search engine
+    const historicalSales = allRawSales.map((sale: any) => {
+      const attrs = sale.attributes || {};
+      const createdAt = attrs.createdAt || '';
+      const { dateStr, artHour, shift } = getArgentinaDateTime(createdAt);
+      const total = Number(attrs.total || 0);
+      const people = Number(attrs.people || 0);
+      const state = attrs.saleState || 'UNKNOWN';
+
+      return {
+        id: sale.id,
+        createdAt,
+        date: dateStr,
+        hour: artHour,
+        shift,
+        total,
+        people,
+        state,
+        comment: attrs.comment || '',
+      };
+    });
+
     // Group sales by date AND shift (YYYY-MM-DD + MEDIODIA / NOCHE)
     const shiftMap: Record<string, {
       date: string;
@@ -168,8 +191,7 @@ export async function POST(request: Request) {
       const createdAt = attrs.createdAt;
       if (!createdAt) return;
 
-      const dateStr = new Date(createdAt).toISOString().split('T')[0];
-      const shift = getShiftFromDate(createdAt);
+      const { dateStr, shift } = getArgentinaDateTime(createdAt);
       const key = `${dateStr}_${shift}`;
 
       const state = attrs.saleState || 'UNKNOWN';
@@ -225,10 +247,32 @@ export async function POST(request: Request) {
     const grandCashTotal = shiftSummary.reduce((acc, d) => acc + d.cashAmount, 0);
     const grandDigitalTotal = shiftSummary.reduce((acc, d) => acc + d.digitalAmount, 0);
 
+    // Filter today's summary for live dashboard cards
+    const todayShifts = shiftSummary.filter(s => s.date === todayStr);
+    const todayMediodia = todayShifts.find(s => s.shift === 'MEDIODIA')?.totalGross || 0;
+    const todayNoche = todayShifts.find(s => s.shift === 'NOCHE')?.totalGross || 0;
+    const todayGross = todayMediodia + todayNoche;
+    const todayPeople = todayShifts.reduce((acc, s) => acc + s.totalPeople, 0);
+    const todayOrders = todayShifts.reduce((acc, s) => acc + s.closedOrdersCount, 0);
+    const todayCash = todayShifts.reduce((acc, s) => acc + s.cashAmount, 0);
+    const todayDigital = todayShifts.reduce((acc, s) => acc + s.digitalAmount, 0);
+
     return NextResponse.json({
       success: true,
       startDate,
       endDate,
+      todayStr,
+      todaySummary: {
+        totalGross: todayGross,
+        mediodiaGross: todayMediodia,
+        nocheGross: todayNoche,
+        totalPeople: todayPeople,
+        totalOrders: todayOrders,
+        cashAmount: todayCash,
+        digitalAmount: todayDigital,
+        avgTicketCover: todayPeople > 0 ? Math.round(todayGross / todayPeople) : 0,
+        avgTicketSale: todayOrders > 0 ? Math.round(todayGross / todayOrders) : 0,
+      },
       totalRawSalesFetched: allRawSales.length,
       shiftsCount: shiftSummary.length,
       grandTotals: {
@@ -241,6 +285,7 @@ export async function POST(request: Request) {
         averageTicketPerSale: grandTotalOrders > 0 ? Math.round(grandTotalGross / grandTotalOrders) : 0,
       },
       dailySummary: shiftSummary,
+      historicalSales,
     });
   } catch (error: any) {
     console.error('Fudo history fetch error:', error);

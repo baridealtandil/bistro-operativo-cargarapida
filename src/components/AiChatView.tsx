@@ -11,10 +11,10 @@ export const AiChatView: React.FC = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const quickQuestions = [
+    '¿Cuánto vendimos hoy al mediodía y a la noche según Fudo?',
+    '¿Cuántos cubiertos atendimos en Fudo hoy y cuál es el promedio por comensal?',
     '¿Cuál es nuestro Prime Cost actual y cómo se desglosa?',
-    '¿Qué cheques y servicios se vencen esta semana?',
-    '¿Cuánto le debemos actualmente a los proveedores?',
-    '¿Cuál es nuestro margen de utilidad neta estimada?'
+    '¿Cuánto le debemos actualmente a los proveedores?'
   ];
 
   const scrollToBottom = () => {

@@ -111,16 +111,15 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAiChat }) => {
 
         {/* Right Actions & Role Switcher */}
         <div className="flex items-center space-x-3">
-          {/* Fudo POS Quick Button */}
-          <button
-            onClick={() => setShowFudoModal(true)}
-            className="flex items-center gap-1.5 bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 text-amber-300 border border-amber-500/30 text-xs font-bold px-3 py-2 rounded-xl transition-all active:scale-95 shadow-sm"
-            title="Ver y Sincronizar datos de Fudo POS en vivo"
+          {/* Fudo POS Live Status Badge (Auto-Sync) */}
+          <div
+            className="flex items-center gap-1.5 bg-slate-800/80 border border-emerald-500/30 text-emerald-400 text-xs font-bold px-3 py-2 rounded-xl shadow-sm cursor-default"
+            title="Conexión 100% automática en tiempo real con Fudo POS"
           >
             <UtensilsCrossed className="w-3.5 h-3.5 text-amber-400" />
-            <span className="hidden sm:inline">Fudo POS</span>
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-          </button>
+            <span className="hidden sm:inline">Fudo POS En Vivo</span>
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+          </div>
 
           {/* AI Quick Button */}
           <button
