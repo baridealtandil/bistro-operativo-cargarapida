@@ -18,8 +18,11 @@ import {
   Receipt,
   CheckSquare,
   Handshake,
-  Plus
+  Plus,
+  UtensilsCrossed,
+  RefreshCw
 } from 'lucide-react';
+import { FudoSyncModal } from './FudoSyncModal';
 import {
   ResponsiveContainer,
   BarChart,
@@ -37,6 +40,7 @@ interface DashboardViewProps {
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
+  const [showFudoModal, setShowFudoModal] = React.useState(false);
   const {
     totalSalesNetMonth,
     totalSalesGrossMonth,
@@ -81,6 +85,35 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
 
   return (
     <div className="space-y-6 pb-12">
+      {/* BANNER EN VIVO DE FUDO POS */}
+      <div className="bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-slate-900 border border-amber-500/30 p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 shadow-lg">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shrink-0">
+            <UtensilsCrossed className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="font-bold text-sm text-white">Sincronización Fudo POS (En Vivo)</h3>
+              <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                Conectado
+              </span>
+            </div>
+            <p className="text-xs text-slate-400">
+              Importa las ventas reales de hoy, comensales y cierres directamente a los indicadores financieros.
+            </p>
+          </div>
+        </div>
+
+        <button
+          onClick={() => setShowFudoModal(true)}
+          className="w-full sm:w-auto px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs rounded-xl shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center gap-2 active:scale-95 shrink-0"
+        >
+          <RefreshCw className="w-3.5 h-3.5" />
+          <span>Sincronizar Fudo en Vivo</span>
+        </button>
+      </div>
+
       {/* HUB DE TARJETAS OPERATIVAS COMPACTAS (CARD LAUNCHPAD) */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
@@ -565,6 +598,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           <div className="text-[10px] text-slate-400 mt-1">Importar CSV o Webhook Make</div>
         </button>
       </div>
+
+      {/* Fudo Sync Modal */}
+      <FudoSyncModal isOpen={showFudoModal} onClose={() => setShowFudoModal(false)} />
     </div>
   );
 };

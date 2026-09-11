@@ -2,14 +2,16 @@
 
 import React, { useState } from 'react';
 import { useGastronomy, classifyPaymentMethod } from '../context/GastronomyContext';
-import { Plus, Sun, Moon, Users, DollarSign, Calendar, Filter, RefreshCw, Wallet, CreditCard, Landmark, ArrowDownCircle, Edit2, ShieldCheck } from 'lucide-react';
+import { Plus, Sun, Moon, Users, DollarSign, Calendar, Filter, RefreshCw, Wallet, CreditCard, Landmark, ArrowDownCircle, Edit2, ShieldCheck, UtensilsCrossed } from 'lucide-react';
 import { Sale } from '../types/gastronomy';
 import { DateRangePicker } from './DateRangePicker';
+import { FudoSyncModal } from './FudoSyncModal';
 
 export const SalesView: React.FC = () => {
   const { sales, addSale, editSale, expenses, role, cajaMayorBalance, mercadoPagoBalance } = useGastronomy();
   const [showModal, setShowModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showFudoModal, setShowFudoModal] = useState(false);
   const [editingSale, setEditingSale] = useState<Sale | null>(null);
 
   // Filtros de Ventas: Rango de Fechas (Calendario Unificado), Turno, Canal y Método de Pago
@@ -204,6 +206,14 @@ export const SalesView: React.FC = () => {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => setShowFudoModal(true)}
+            className="flex items-center gap-1.5 bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 text-amber-300 border border-amber-500/40 text-xs font-bold px-3.5 py-2.5 rounded-xl shadow-lg transition-all"
+          >
+            <UtensilsCrossed className="w-4 h-4 text-amber-400" />
+            <span>Sincronizar Fudo</span>
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          </button>
           <button
             onClick={() => setShowModal(true)}
             className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg transition-all"
@@ -784,6 +794,9 @@ export const SalesView: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Fudo Sync Modal */}
+      <FudoSyncModal isOpen={showFudoModal} onClose={() => setShowFudoModal(false)} />
     </div>
   );
 };

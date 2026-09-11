@@ -3,9 +3,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Image from 'next/image';
 import { useGastronomy } from '../context/GastronomyContext';
-import { Shield, User, Bell, Sparkles, AlertTriangle, Clock, DollarSign, CheckCircle2, X, LogOut } from 'lucide-react';
+import { Shield, User, Bell, Sparkles, AlertTriangle, Clock, DollarSign, CheckCircle2, X, LogOut, UtensilsCrossed } from 'lucide-react';
 
 import { AdminPinModal } from './AdminPinModal';
+import { FudoSyncModal } from './FudoSyncModal';
 
 interface HeaderProps {
   onOpenAiChat: () => void;
@@ -27,6 +28,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAiChat }) => {
 
   const [showNotifications, setShowNotifications] = useState(false);
   const [showAdminPinModal, setShowAdminPinModal] = useState(false);
+  const [showFudoModal, setShowFudoModal] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
 
   const handleLogout = () => {
@@ -109,6 +111,17 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAiChat }) => {
 
         {/* Right Actions & Role Switcher */}
         <div className="flex items-center space-x-3">
+          {/* Fudo POS Quick Button */}
+          <button
+            onClick={() => setShowFudoModal(true)}
+            className="flex items-center gap-1.5 bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 text-amber-300 border border-amber-500/30 text-xs font-bold px-3 py-2 rounded-xl transition-all active:scale-95 shadow-sm"
+            title="Ver y Sincronizar datos de Fudo POS en vivo"
+          >
+            <UtensilsCrossed className="w-3.5 h-3.5 text-amber-400" />
+            <span className="hidden sm:inline">Fudo POS</span>
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          </button>
+
           {/* AI Quick Button */}
           <button
             onClick={onOpenAiChat}
@@ -211,6 +224,9 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAiChat }) => {
           </button>
         </div>
       </div>
+
+      {/* Fudo Live Sync Modal */}
+      <FudoSyncModal isOpen={showFudoModal} onClose={() => setShowFudoModal(false)} />
     </header>
   );
 };
