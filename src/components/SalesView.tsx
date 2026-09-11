@@ -307,49 +307,66 @@ export const SalesView: React.FC = () => {
         </div>
       </div>
 
-      {/* TARJETAS FINANCIERAS: CAJA MAYOR Y MERCADOPAGO/BANCOS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* 1. Ventas en Efectivo */}
+      {/* TARJETAS FINANCIERAS Y DE CONTROL GLOBAL */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        {/* 1. Total Ventas del Período (100%) */}
+        <div className="bg-slate-900 border border-amber-500/50 p-4 rounded-2xl space-y-2 relative overflow-hidden bg-amber-950/20 shadow-lg">
+          <div className="flex items-center justify-between text-xs text-amber-400 font-bold">
+            <span className="flex items-center gap-1.5"><DollarSign className="w-4 h-4 text-amber-400" /> Total Ventas Período</span>
+            <span className="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded font-black">100% Fudo POS</span>
+          </div>
+          <div className="text-2xl font-black text-amber-400">${periodSalesNet.toLocaleString('es-AR')}</div>
+          <div className="text-[10px] text-slate-400 flex justify-between items-center border-t border-amber-500/20 pt-1">
+            <span>Efectivo + MP / Digital</span>
+            <span className="font-bold text-slate-300">{periodCovers} pax</span>
+          </div>
+        </div>
+
+        {/* 2. Ventas en Efectivo */}
         <div className="bg-slate-900 border border-emerald-500/30 p-4 rounded-2xl space-y-2 relative overflow-hidden bg-emerald-950/10">
           <div className="flex items-center justify-between text-xs text-emerald-400 font-bold">
             <span className="flex items-center gap-1.5"><Wallet className="w-4 h-4" /> Ventas Efectivo</span>
-            <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded font-bold">Fudo POS</span>
+            <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded font-bold">
+              {periodSalesNet > 0 ? `${((periodCashSales / periodSalesNet) * 100).toFixed(1)}%` : 'Fudo POS'}
+            </span>
           </div>
           <div className="text-2xl font-black text-emerald-400">${periodCashSales.toLocaleString('es-AR')}</div>
           <div className="text-[10px] text-slate-400">Total cobrado en efectivo</div>
         </div>
 
-        {/* 2. Ventas MercadoPago / Tarjetas */}
+        {/* 3. Ventas MercadoPago / Tarjetas */}
         <div className="bg-slate-900 border border-blue-500/30 p-4 rounded-2xl space-y-2 relative overflow-hidden bg-blue-950/10">
           <div className="flex items-center justify-between text-xs text-blue-400 font-bold">
-            <span className="flex items-center gap-1.5"><CreditCard className="w-4 h-4" /> Ventas MercadoPago / Tarjeta</span>
-            <span className="text-[10px] bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded font-bold">Digital</span>
+            <span className="flex items-center gap-1.5"><CreditCard className="w-4 h-4" /> Ventas MercadoPago / Digital</span>
+            <span className="text-[10px] bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded font-bold">
+              {periodSalesNet > 0 ? `${((periodDigitalSales / periodSalesNet) * 100).toFixed(1)}%` : 'Digital'}
+            </span>
           </div>
           <div className="text-2xl font-black text-blue-400">${periodDigitalSales.toLocaleString('es-AR')}</div>
           <div className="text-[10px] text-slate-400">MercadoPago, QR, Débito, Crédito</div>
         </div>
 
-        {/* 3. Caja Mayor (Efectivo Disponible Descontando Pagos) */}
-        <div className="bg-slate-900 border border-amber-500/40 p-4 rounded-2xl space-y-2 relative overflow-hidden bg-amber-950/10">
+        {/* 4. Caja Mayor (Efectivo Disponible Descontando Pagos) */}
+        <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl space-y-2 relative overflow-hidden">
           <div className="flex items-center justify-between text-xs text-amber-400 font-bold">
-            <span className="flex items-center gap-1.5"><Landmark className="w-4 h-4" /> Caja Mayor (Disponible)</span>
-            <span className="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded font-bold">Saldo Neto</span>
+            <span className="flex items-center gap-1.5"><Landmark className="w-4 h-4" /> Caja Mayor (Neto)</span>
+            <span className="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded font-bold">Disponible</span>
           </div>
           <div className={`text-2xl font-black ${liveCajaMayor >= 0 ? 'text-amber-400' : 'text-rose-400'}`}>
             ${liveCajaMayor.toLocaleString('es-AR')}
           </div>
           <div className="text-[10px] text-slate-400 flex items-center gap-1">
-            <ArrowDownCircle className="w-3 h-3 text-rose-400" /> Descontados ${periodCashExpenses.toLocaleString('es-AR')} en pagos
+            <ArrowDownCircle className="w-3 h-3 text-rose-400" /> Descontados ${periodCashExpenses.toLocaleString('es-AR')}
           </div>
         </div>
 
-        {/* 4. Cuenta MercadoPago / Banco (Real App MP API) */}
+        {/* 5. Cuenta MercadoPago / Banco (Real App MP API) */}
         <div className="bg-slate-900 border border-indigo-500/40 p-4 rounded-2xl space-y-2 relative overflow-hidden bg-indigo-950/10">
           <div className="flex items-center justify-between text-xs text-indigo-400 font-bold">
-            <span className="flex items-center gap-1.5"><Landmark className="w-4 h-4" /> Saldo MercadoPago / Banco</span>
-            <span className="text-[10px] bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded font-bold">Cuenta Digital MP</span>
+            <span className="flex items-center gap-1.5"><Landmark className="w-4 h-4" /> Saldo MP Real</span>
+            <span className="text-[10px] bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded font-bold">Cuenta App</span>
           </div>
-          <div className="text-2xl font-black text-indigo-300 tracking-tight">
+          <div className="text-xl font-black text-indigo-300 tracking-tight">
             ${realMpAvailable.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
           </div>
           <div className="text-[10px] text-slate-400 flex flex-col gap-0.5 border-t border-slate-800/80 pt-1 font-mono">
@@ -357,11 +374,72 @@ export const SalesView: React.FC = () => {
               <span>A liquidar:</span>
               <span className="font-bold text-amber-300">${realMpPending.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
             </div>
-            <div className="flex justify-between">
-              <span>Total Consolidado MP:</span>
-              <span className="font-bold text-emerald-400">${realMpConsolidated.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* TARJETAS DE CANALES DE VENTA FUDO (SALÓN, DELIVERY, MOSTRADOR, PEDIDOSYA) */}
+      <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl space-y-4">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+          <div className="flex items-center gap-2">
+            <UtensilsCrossed className="w-5 h-5 text-amber-400" />
+            <div>
+              <h3 className="text-sm font-bold text-white">Canales de Venta Fudo POS (Desglose de Ingresos)</h3>
+              <p className="text-[11px] text-slate-400">Total acumulado por Salón, Delivery, Mostrador y Plataformas Digitales</p>
             </div>
           </div>
+          <span className="text-xs font-bold text-slate-400 bg-slate-800 px-3 py-1 rounded-xl">
+            {fudoLive?.channelsSummary ? `${fudoLive.channelsSummary.length} canales activos` : 'Cargando canales...'}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {fudoLive?.channelsSummary && fudoLive.channelsSummary.length > 0 ? (
+            fudoLive.channelsSummary.map((ch: any) => {
+              const isSalon = ch.channelId === 'SALON';
+              const isDelivery = ch.channelId === 'DELIVERY';
+              const isMostrador = ch.channelId === 'MOSTRADOR';
+              const isPeya = ch.channelId === 'PEDIDOS_YA';
+
+              const badgeBg = isSalon 
+                ? 'bg-amber-500/10 border-amber-500/30 text-amber-400' 
+                : isDelivery 
+                ? 'bg-purple-500/10 border-purple-500/30 text-purple-400'
+                : isMostrador
+                ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400'
+                : 'bg-rose-500/10 border-rose-500/30 text-rose-400';
+
+              const icon = isSalon ? '🍽️' : isDelivery ? '🛵' : isMostrador ? '🛍️' : isPeya ? '📱' : '📦';
+
+              return (
+                <div key={ch.channelId} className={`bg-slate-950/60 border ${badgeBg.split(' ')[1]} p-4 rounded-xl space-y-3 relative hover:border-amber-400/50 transition-all`}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                      <span className="text-base">{icon}</span> {ch.label}
+                    </span>
+                    <span className={`text-[10px] font-black px-2 py-0.5 rounded ${badgeBg}`}>
+                      {ch.percentage}% del total
+                    </span>
+                  </div>
+
+                  <div>
+                    <div className="text-xl font-black text-white">${ch.totalGross.toLocaleString('es-AR')}</div>
+                  </div>
+
+                  <div className="flex justify-between items-center text-[11px] text-slate-400 border-t border-slate-800/80 pt-2 font-medium">
+                    <span>{ch.ordersCount} órdenes</span>
+                    {ch.peopleCount > 0 && (
+                      <span className="text-amber-300 font-bold">{ch.peopleCount} pax ({Math.round(ch.totalGross / ch.peopleCount).toLocaleString('es-AR')}/pax)</span>
+                    )}
+                  </div>
+                </div>
+              );
+            })
+          ) : (
+            <div className="col-span-4 text-center py-6 text-slate-400 text-xs font-medium">
+              Sincronizando información de canales desde Fudo POS...
+            </div>
+          )}
         </div>
       </div>
 

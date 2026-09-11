@@ -444,6 +444,51 @@ export const FudoLiveDashboard: React.FC = () => {
                   </div>
                 </div>
 
+                {/* TARJETAS DE CANALES DE VENTA FUDO (SALÓN, DELIVERY, MOSTRADOR, PEDIDOSYA) */}
+                <div className="space-y-3 pt-3 border-t border-slate-800">
+                  <div className="text-xs font-bold text-slate-300 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5"><UtensilsCrossed className="w-4 h-4 text-amber-400" /> Canales de Venta Fudo POS</span>
+                    <span className="text-[10px] text-amber-400 font-mono">Salón, Delivery, Mostrador y PedidosYa</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    {(data as any).channelsSummary && (data as any).channelsSummary.length > 0 ? (
+                      (data as any).channelsSummary.map((ch: any) => {
+                        const isSalon = ch.channelId === 'SALON';
+                        const isDelivery = ch.channelId === 'DELIVERY';
+                        const isMostrador = ch.channelId === 'MOSTRADOR';
+                        const isPeya = ch.channelId === 'PEDIDOS_YA';
+
+                        const badgeBg = isSalon 
+                          ? 'bg-amber-500/10 border-amber-500/30 text-amber-400' 
+                          : isDelivery 
+                          ? 'bg-purple-500/10 border-purple-500/30 text-purple-400'
+                          : isMostrador
+                          ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400'
+                          : 'bg-rose-500/10 border-rose-500/30 text-rose-400';
+
+                        const icon = isSalon ? '🍽️' : isDelivery ? '🛵' : isMostrador ? '🛍️' : isPeya ? '📱' : '📦';
+
+                        return (
+                          <div key={ch.channelId} className={`bg-slate-950/80 border ${badgeBg.split(' ')[1]} p-3.5 rounded-xl space-y-2 relative`}>
+                            <div className="flex items-center justify-between text-xs font-bold text-slate-200">
+                              <span>{icon} {ch.label}</span>
+                              <span className={`text-[10px] font-black px-2 py-0.5 rounded ${badgeBg}`}>{ch.percentage}%</span>
+                            </div>
+                            <div className="text-lg font-black text-white">${ch.totalGross.toLocaleString('es-AR')}</div>
+                            <div className="flex justify-between items-center text-[10px] text-slate-400 border-t border-slate-800/80 pt-1.5">
+                              <span>{ch.ordersCount} órdenes</span>
+                              {ch.peopleCount > 0 && <span className="text-amber-300 font-bold">{ch.peopleCount} pax</span>}
+                            </div>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className="col-span-4 text-center py-4 text-slate-500 text-xs">Sin información de canales</div>
+                    )}
+                  </div>
+                </div>
+
                 {/* Progress Bar Distribution */}
                 <div className="space-y-1.5 pt-2">
                   <div className="flex flex-col sm:flex-row justify-between text-xs text-slate-400 font-medium gap-1">

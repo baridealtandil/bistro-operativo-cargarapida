@@ -286,6 +286,63 @@ export async function POST(request: Request) {
     const todayCash = todayShifts.reduce((acc, s) => acc + s.cashAmount, 0);
     const todayDigital = todayShifts.reduce((acc, s) => acc + s.digitalAmount, 0);
 
+    // Channel Breakdown Calculation (Salón, Delivery, Mostrador, PedidosYa, Rappi)
+    const channelMap: Record<string, {
+      channelId: string;
+      label: string;
+      totalGross: number;
+      ordersCount: number;
+      peopleCount: number;
+    }> = {
+      SALON: { channelId: 'SALON', label: 'Salón (EAT-IN)', totalGross: 0, ordersCount: 0, peopleCount: 0 },
+      MOSTRADOR: { channelId: 'MOSTRADOR', label: 'Mostrador / Para llevar', totalGross: 0, ordersCount: 0, peopleCount: 0 },
+      DELIVERY: { channelId: 'DELIVERY', label: 'Delivery Propio', totalGross: 0, ordersCount: 0, peopleCount: 0 },
+      PEDIDOS_YA: { channelId: 'PEDIDOS_YA', label: 'PedidosYa', totalGross: 0, ordersCount: 0, peopleCount: 0 },
+      RAPPI: { channelId: 'RAPPI', label: 'Rappi', totalGross: 0, ordersCount: 0, peopleCount: 0 },
+      OTROS: { channelId: 'OTROS', label: 'Otros Canales', totalGross: 0, ordersCount: 0, peopleCount: 0 },
+    };
+
+    allRawSales.forEach((sale: any) => {
+      const attrs = sale.attributes || {};
+      const createdAt = attrs.createdAt;
+      if (!createdAt) return;
+
+      const { dateStr } = getArgentinaDateTime(createdAt);
+      if (dateStr < startDate || dateStr > endDate) return;
+      if (attrs.saleState !== 'CLOSED') return;
+
+      const total = Number(attrs.total || 0);
+      const people = Number(attrs.people || 0);
+      const rawType = (attrs.saleType || '').toUpperCase();
+      const comment = (attrs.comment || '').toLowerCase();
+
+      let targetChannel = 'OTROS';
+      if (rawType === 'EAT-IN') {
+        targetChannel = 'SALON';
+      } else if (rawType === 'TAKEAWAY' || rawType === 'TAKE_AWAY') {
+        targetChannel = 'MOSTRADOR';
+      } else if (rawType === 'DELIVERY') {
+        if (comment.includes('pedidosya') || comment.includes('pedidos ya') || comment.includes('peya')) {
+          targetChannel = 'PEDIDOS_YA';
+        } else if (comment.includes('rappi')) {
+          targetChannel = 'RAPPI';
+        } else {
+          targetChannel = 'DELIVERY';
+        }
+      }
+
+      channelMap[targetChannel].totalGross += total;
+      channelMap[targetChannel].ordersCount += 1;
+      channelMap[targetChannel].peopleCount += people;
+    });
+
+    const channelsSummary = Object.values(channelMap)
+      .filter(ch => ch.ordersCount > 0 || ch.channelId === 'SALON' || ch.channelId === 'DELIVERY' || ch.channelId === 'MOSTRADOR' || ch.channelId === 'PEDIDOS_YA')
+      .map(ch => ({
+        ...ch,
+        percentage: grandTotalGross > 0 ? Math.round((ch.totalGross / grandTotalGross) * 1000) / 10 : 0
+      }));
+
     return NextResponse.json({
       success: true,
       startDate,
@@ -313,6 +370,7 @@ export async function POST(request: Request) {
         averageTicketPerCover: grandTotalPeople > 0 ? Math.round(grandTotalGross / grandTotalPeople) : 0,
         averageTicketPerSale: grandTotalOrders > 0 ? Math.round(grandTotalGross / grandTotalOrders) : 0,
       },
+      channelsSummary,
       dailySummary: shiftSummary,
       historicalSales,
     });
