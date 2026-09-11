@@ -285,7 +285,18 @@ export const GastronomyProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       }
 
       const savedSales = localStorage.getItem('gastro_sales');
-      if (savedSales) setSales(JSON.parse(savedSales));
+      if (savedSales) {
+        const parsedSales: Sale[] = JSON.parse(savedSales);
+        const seen = new Set<string>();
+        const deduplicatedSales = parsedSales.filter(s => {
+          const key = `${s.date}_${s.shift}_${s.paymentMethod}_${s.grossAmount}`;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+        setSales(deduplicatedSales);
+        try { localStorage.setItem('gastro_sales', JSON.stringify(deduplicatedSales)); } catch (e) {}
+      }
 
       const authedCookie = document.cookie.split('; ').find(c => c.startsWith('app_authenticated='));
       const authedLocal = localStorage.getItem('gastro_app_authed');
@@ -398,7 +409,7 @@ export const GastronomyProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       const isFudoImport = saleData.notes?.includes('Fudo POS');
       if (isFudoImport) {
         const existingIdx = prev.findIndex(
-          s => s.date === saleData.date && s.shift === saleData.shift && s.notes?.includes('Fudo POS')
+          s => s.date === saleData.date && s.shift === saleData.shift && s.paymentMethod === saleData.paymentMethod && s.notes?.includes('Fudo POS')
         );
         if (existingIdx >= 0) {
           const existingId = prev[existingIdx].id;

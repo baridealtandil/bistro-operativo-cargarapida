@@ -205,10 +205,12 @@ export const FudoSyncModal: React.FC<FudoSyncModalProps> = ({ isOpen, onClose })
         const cashAmt = day.cashAmount || Math.round(day.totalGross * 0.45);
         const digitalAmt = day.digitalAmount || (day.totalGross - cashAmt);
 
+        const shiftVal: 'MEDIODIA' | 'NOCHE' = (day as any).shift || 'NOCHE';
+
         if (cashAmt > 0) {
           addSale({
             date: day.date,
-            shift: 'NOCHE',
+            shift: shiftVal,
             covers: Math.round(day.totalPeople * 0.45) || 1,
             channel: 'SALON',
             paymentMethod: 'EFECTIVO',
@@ -221,7 +223,7 @@ export const FudoSyncModal: React.FC<FudoSyncModalProps> = ({ isOpen, onClose })
         if (digitalAmt > 0) {
           addSale({
             date: day.date,
-            shift: 'NOCHE',
+            shift: shiftVal,
             covers: Math.max(1, day.totalPeople - (Math.round(day.totalPeople * 0.45) || 1)),
             channel: 'SALON',
             paymentMethod: 'MERCADO_PAGO',

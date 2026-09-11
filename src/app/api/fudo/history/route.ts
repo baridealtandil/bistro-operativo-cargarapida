@@ -39,6 +39,18 @@ async function getFudoToken(apiKey = DEFAULT_API_KEY, apiSecret = DEFAULT_API_SE
   return cachedToken;
 }
 
+function getShiftFromDate(isoDateString: string): 'MEDIODIA' | 'NOCHE' {
+  const date = new Date(isoDateString);
+  // Argentina is UTC-3
+  const utcHour = date.getUTCHours();
+  const artHour = (utcHour - 3 + 24) % 24;
+
+  if (artHour >= 6 && artHour < 17) {
+    return 'MEDIODIA';
+  }
+  return 'NOCHE';
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -77,8 +89,8 @@ export async function POST(request: Request) {
       else pmPage++;
     }
 
-    // Map daily payments (Cash vs Digital)
-    const dailyPaymentsMap: Record<string, { cash: number; digital: number }> = {};
+    // Map payments by date and shift
+    const shiftPaymentsMap: Record<string, { cash: number; digital: number }> = {};
     allPayments.forEach((p: any) => {
       const attrs = p.attributes || {};
       if (attrs.canceled) return;
@@ -86,18 +98,21 @@ export async function POST(request: Request) {
       if (!createdAt) return;
 
       const dateStr = new Date(createdAt).toISOString().split('T')[0];
+      const shift = getShiftFromDate(createdAt);
+      const key = `${dateStr}_${shift}`;
+
       const amount = Number(attrs.amount || 0);
       const pmId = p.relationships?.paymentMethod?.data?.id;
       const pmName = pmId ? (pmMap[pmId] || '') : '';
 
-      if (!dailyPaymentsMap[dateStr]) {
-        dailyPaymentsMap[dateStr] = { cash: 0, digital: 0 };
+      if (!shiftPaymentsMap[key]) {
+        shiftPaymentsMap[key] = { cash: 0, digital: 0 };
       }
 
       if (pmName.toLowerCase().includes('efectivo')) {
-        dailyPaymentsMap[dateStr].cash += amount;
+        shiftPaymentsMap[key].cash += amount;
       } else {
-        dailyPaymentsMap[dateStr].digital += amount;
+        shiftPaymentsMap[key].digital += amount;
       }
     });
 
@@ -134,9 +149,10 @@ export async function POST(request: Request) {
       }
     }
 
-    // Group sales by day (YYYY-MM-DD)
-    const dailyMap: Record<string, {
+    // Group sales by date AND shift (YYYY-MM-DD + MEDIODIA / NOCHE)
+    const shiftMap: Record<string, {
       date: string;
+      shift: 'MEDIODIA' | 'NOCHE';
       totalGross: number;
       closedOrdersCount: number;
       canceledOrdersCount: number;
@@ -152,14 +168,18 @@ export async function POST(request: Request) {
       if (!createdAt) return;
 
       const dateStr = new Date(createdAt).toISOString().split('T')[0];
+      const shift = getShiftFromDate(createdAt);
+      const key = `${dateStr}_${shift}`;
+
       const state = attrs.saleState || 'UNKNOWN';
       const total = Number(attrs.total || 0);
       const people = Number(attrs.people || 0);
 
-      if (!dailyMap[dateStr]) {
-        const pInfo = dailyPaymentsMap[dateStr] || { cash: 0, digital: 0 };
-        dailyMap[dateStr] = {
+      if (!shiftMap[key]) {
+        const pInfo = shiftPaymentsMap[key] || { cash: 0, digital: 0 };
+        shiftMap[key] = {
           date: dateStr,
+          shift,
           totalGross: 0,
           closedOrdersCount: 0,
           canceledOrdersCount: 0,
@@ -170,51 +190,55 @@ export async function POST(request: Request) {
         };
       }
 
-      const dayObj = dailyMap[dateStr];
+      const shiftObj = shiftMap[key];
 
       if (state === 'CLOSED') {
-        dayObj.totalGross += total;
-        dayObj.closedOrdersCount += 1;
-        dayObj.totalPeople += people;
+        shiftObj.totalGross += total;
+        shiftObj.closedOrdersCount += 1;
+        shiftObj.totalPeople += people;
       } else if (state === 'CANCELED') {
-        dayObj.canceledOrdersCount += 1;
+        shiftObj.canceledOrdersCount += 1;
       } else if (state === 'IN-COURSE') {
-        dayObj.inCourseOrdersCount += 1;
+        shiftObj.inCourseOrdersCount += 1;
       }
     });
 
-    // If payments weren't recorded per payment method, fallback to 45% cash / 55% digital estimate
-    Object.values(dailyMap).forEach(day => {
-      if (day.cashAmount === 0 && day.digitalAmount === 0 && day.totalGross > 0) {
-        day.cashAmount = Math.round(day.totalGross * 0.45);
-        day.digitalAmount = day.totalGross - day.cashAmount;
+    // Fallback payment split if zero
+    Object.values(shiftMap).forEach(sObj => {
+      if (sObj.cashAmount === 0 && sObj.digitalAmount === 0 && sObj.totalGross > 0) {
+        sObj.cashAmount = Math.round(sObj.totalGross * 0.45);
+        sObj.digitalAmount = sObj.totalGross - sObj.cashAmount;
       }
     });
 
-    const dailySummary = Object.values(dailyMap).sort((a, b) => a.date.localeCompare(b.date));
+    const shiftSummary = Object.values(shiftMap).sort((a, b) => {
+      if (a.date === b.date) {
+        return a.shift === 'MEDIODIA' ? -1 : 1;
+      }
+      return a.date.localeCompare(b.date);
+    });
 
-    const grandTotalGross = dailySummary.reduce((acc, d) => acc + d.totalGross, 0);
-    const grandTotalPeople = dailySummary.reduce((acc, d) => acc + d.totalPeople, 0);
-    const grandTotalOrders = dailySummary.reduce((acc, d) => acc + d.closedOrdersCount, 0);
-    const grandCashTotal = dailySummary.reduce((acc, d) => acc + d.cashAmount, 0);
-    const grandDigitalTotal = dailySummary.reduce((acc, d) => acc + d.digitalAmount, 0);
+    const grandTotalGross = shiftSummary.reduce((acc, d) => acc + d.totalGross, 0);
+    const grandTotalPeople = shiftSummary.reduce((acc, d) => acc + d.totalPeople, 0);
+    const grandTotalOrders = shiftSummary.reduce((acc, d) => acc + d.closedOrdersCount, 0);
+    const grandCashTotal = shiftSummary.reduce((acc, d) => acc + d.cashAmount, 0);
+    const grandDigitalTotal = shiftSummary.reduce((acc, d) => acc + d.digitalAmount, 0);
 
     return NextResponse.json({
       success: true,
       startDate,
       endDate,
       totalRawSalesFetched: allRawSales.length,
-      daysCount: dailySummary.length,
+      shiftsCount: shiftSummary.length,
       grandTotals: {
         totalGrossAmount: grandTotalGross,
         totalCashAmount: grandCashTotal,
         totalDigitalAmount: grandDigitalTotal,
         totalPeopleCount: grandTotalPeople,
         totalClosedOrders: grandTotalOrders,
-        averageDailyGross: dailySummary.length > 0 ? Math.round(grandTotalGross / dailySummary.length) : 0,
         averageTicketPerCover: grandTotalPeople > 0 ? Math.round(grandTotalGross / grandTotalPeople) : 0,
       },
-      dailySummary,
+      dailySummary: shiftSummary,
     });
   } catch (error: any) {
     console.error('Fudo history fetch error:', error);
