@@ -137,7 +137,7 @@ export async function POST(request: Request) {
     sStartObj.setDate(sStartObj.getDate() - 1);
     const sStartStr = sStartObj.toISOString().split('T')[0];
 
-    const sEndObj = new Date(endDate);
+    const sEndObj = new Date(endDate > todayStr ? endDate : todayStr);
     sEndObj.setDate(sEndObj.getDate() + 1);
     const sEndStr = sEndObj.toISOString().split('T')[0];
 
@@ -276,15 +276,45 @@ export async function POST(request: Request) {
     const grandCashTotal = shiftSummary.reduce((acc, d) => acc + d.cashAmount, 0);
     const grandDigitalTotal = shiftSummary.reduce((acc, d) => acc + d.digitalAmount, 0);
 
-    // Filter today's summary for live dashboard cards
-    const todayShifts = shiftSummary.filter(s => s.date === todayStr);
-    const todayMediodia = todayShifts.find(s => s.shift === 'MEDIODIA')?.totalGross || 0;
-    const todayNoche = todayShifts.find(s => s.shift === 'NOCHE')?.totalGross || 0;
+    // Filter today's summary for live dashboard cards (including active CLOSED, IN-COURSE, PAYMENT-PROCESS sales)
+    const todaySales = allRawSales.filter((sale: any) => {
+      const attrs = sale.attributes || {};
+      if (!attrs.createdAt || attrs.saleState === 'CANCELED') return false;
+      const { dateStr } = getArgentinaDateTime(attrs.createdAt);
+      return dateStr === todayStr;
+    });
+
+    let todayMediodia = 0;
+    let todayNoche = 0;
+    let todayPeople = 0;
+    let todayOrders = 0;
+    let todayCash = 0;
+    let todayDigital = 0;
+
+    todaySales.forEach((sale: any) => {
+      const attrs = sale.attributes || {};
+      const { shift } = getArgentinaDateTime(attrs.createdAt);
+      const total = Number(attrs.total || 0);
+      const people = Number(attrs.people || 0);
+
+      if (shift === 'MEDIODIA') todayMediodia += total;
+      else todayNoche += total;
+
+      todayPeople += people;
+      todayOrders += 1;
+
+      const pInfo = salePaymentMap[sale.id];
+      if (pInfo && (pInfo.cash > 0 || pInfo.digital > 0)) {
+        todayCash += pInfo.cash;
+        todayDigital += pInfo.digital;
+      } else {
+        const c = Math.round(total * 0.45);
+        todayCash += c;
+        todayDigital += (total - c);
+      }
+    });
+
     const todayGross = todayMediodia + todayNoche;
-    const todayPeople = todayShifts.reduce((acc, s) => acc + s.totalPeople, 0);
-    const todayOrders = todayShifts.reduce((acc, s) => acc + s.closedOrdersCount, 0);
-    const todayCash = todayShifts.reduce((acc, s) => acc + s.cashAmount, 0);
-    const todayDigital = todayShifts.reduce((acc, s) => acc + s.digitalAmount, 0);
 
     // Channel Breakdown Calculation (Salón, Delivery, Mostrador, PedidosYa, Rappi)
     const channelMap: Record<string, {
