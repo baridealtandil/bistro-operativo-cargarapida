@@ -228,6 +228,9 @@ export async function POST(request: Request) {
         const createdIso = p.date_created || p.date_approved || '';
         const { dateStr, artHour, shift } = getArgentinaDateTime(createdIso);
 
+        // Strict filter: Exclude movements outside the requested local Argentina date range
+        if (dateStr < startDate || dateStr > endDate) return;
+
         const posModel = p.point_of_interaction?.device?.model || '';
         const paymentType = p.payment_type_id || p.payment_method_id || 'QR/Digital';
         const walletName = p.point_of_interaction?.transaction_data?.bank_info?.payer?.long_name || '';
@@ -504,9 +507,14 @@ export async function POST(request: Request) {
         mpFee: eg.feeAmount,
         mpTax: eg.taxAmount,
         mpDevice: 'Transferencia Saliente',
-        mpDate: eg.dateStr,
-        mpDescription: eg.description,
       });
+    });
+
+    // Sort reconciliation rows descending by ID / Date (newest first)
+    reconciliationRows.sort((a, b) => {
+      const idA = Number(a.fudoSaleId || a.mpPaymentId || 0);
+      const idB = Number(b.fudoSaleId || b.mpPaymentId || 0);
+      return idB - idA;
     });
 
     // Calculate overall KPIs
