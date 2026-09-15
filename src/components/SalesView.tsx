@@ -16,8 +16,8 @@ export const SalesView: React.FC = () => {
   const [editingSale, setEditingSale] = useState<Sale | null>(null);
 
   // Filtros de Ventas: Rango de Fechas (Calendario Unificado), Turno, Canal y Método de Pago
-  const [startDate, setStartDate] = useState<string>('2026-09-01');
-  const [endDate, setEndDate] = useState<string>('2026-09-30');
+  const [startDate, setStartDate] = useState<string>(getLocalDateString().slice(0, 7) + '-01');
+  const [endDate, setEndDate] = useState<string>(getLocalDateString());
   const [filterShift, setFilterShift] = useState<string>('TODOS');
   const [filterChannel, setFilterChannel] = useState<string>('TODOS');
   const [filterPaymentMethod, setFilterPaymentMethod] = useState<string>('TODOS');

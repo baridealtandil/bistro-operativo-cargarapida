@@ -47,7 +47,8 @@ export default function MercadoPagoReconciliationView({
   };
 
   const today = getTodayStr();
-  const [startDate, setStartDate] = useState(initialStart || today);
+  const defaultMonthStart = today.slice(0, 7) + '-01';
+  const [startDate, setStartDate] = useState(initialStart || defaultMonthStart);
   const [endDate, setEndDate] = useState(initialEnd || today);
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<any>(null);

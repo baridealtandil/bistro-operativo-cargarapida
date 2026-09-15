@@ -39,9 +39,12 @@ import {
 } from 'recharts';
 
 export const FudoLiveDashboard: React.FC = () => {
-  const [period, setPeriod] = useState<'TODAY' | '7DAYS' | 'MONTH' | 'PREV_MONTH' | 'CUSTOM'>('7DAYS');
-  const [customStart, setCustomStart] = useState<string>(getLocalDateString(new Date(Date.now() - 7 * 86400 * 1000)));
-  const [customEnd, setCustomEnd] = useState<string>(getLocalDateString());
+  const getMonthFirstDay = () => getLocalDateString().slice(0, 7) + '-01';
+  const getTodayDate = () => getLocalDateString();
+
+  const [period, setPeriod] = useState<'TODAY' | '7DAYS' | 'MONTH' | 'PREV_MONTH' | 'CUSTOM'>('MONTH');
+  const [customStart, setCustomStart] = useState<string>(getMonthFirstDay());
+  const [customEnd, setCustomEnd] = useState<string>(getTodayDate());
   
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
