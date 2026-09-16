@@ -483,42 +483,8 @@ export async function POST(request: Request) {
             mpDate: fudoSale.dateStr,
             mpDescription: 'Venta Efectivo en Fudo',
           });
-        } else if (pmName.includes('Online Pedidos Ya') || pmName.includes('Pedidos Ya')) {
-          reconciliationRows.push({
-            status: 'FUDO_PEDIDOSYA_ONLINE',
-            fudoSaleId: hasSplitPayments ? `${fudoSale.id} (Pago ${pIdx + 1})` : fudoSale.id,
-            fudoTotal: fpAmount,
-            fudoShift: fudoSale.shift,
-            fudoDate: fudoSale.dateStr,
-            fudoPmName: pmName,
-            mpPaymentId: null,
-            mpGross: 0,
-            mpNet: 0,
-            mpFee: 0,
-            mpTax: 0,
-            mpDevice: 'Plataforma PedidosYa',
-            mpDate: fudoSale.dateStr,
-            mpDescription: 'Cobro Plataforma Online PedidosYa',
-          });
-        } else if (pmName.includes('Tarj. Débito') || pmName.includes('Tarj. Crédito')) {
-          reconciliationRows.push({
-            status: 'FUDO_POSNET_CARD',
-            fudoSaleId: hasSplitPayments ? `${fudoSale.id} (Pago ${pIdx + 1})` : fudoSale.id,
-            fudoTotal: fpAmount,
-            fudoShift: fudoSale.shift,
-            fudoDate: fudoSale.dateStr,
-            fudoPmName: pmName,
-            mpPaymentId: null,
-            mpGross: 0,
-            mpNet: 0,
-            mpFee: 0,
-            mpTax: 0,
-            mpDevice: 'Posnet Físico Tradicional',
-            mpDate: fudoSale.dateStr,
-            mpDescription: `Cobro por Posnet Físico (${pmName})`,
-          });
         } else {
-          // True QR / Mercado Pago Descalce in Fudo
+          // Fudo Mercado Pago sale without MP income match
           reconciliationRows.push({
             status: 'UNMATCHED_FUDO',
             fudoSaleId: hasSplitPayments ? `${fudoSale.id} (Pago ${pIdx + 1})` : fudoSale.id,
@@ -533,7 +499,7 @@ export async function POST(request: Request) {
             mpTax: 0,
             mpDevice: 'N/A',
             mpDate: fudoSale.dateStr,
-            mpDescription: `Pago ${pmName} en Fudo sin acreditación MP`,
+            mpDescription: `Cobro ${pmName} en Fudo sin acreditación MP`,
           });
         }
       });
