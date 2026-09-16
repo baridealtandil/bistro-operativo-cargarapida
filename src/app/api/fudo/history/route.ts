@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 const FUDO_AUTH_URL = 'https://auth.fu.do/api';
 const FUDO_API_BASE = 'https://api.fu.do/v1alpha1';
 
@@ -244,7 +247,9 @@ export async function POST(request: Request) {
       if (state === 'CLOSED') {
         shiftObj.totalGross += total;
         shiftObj.closedOrdersCount += 1;
-        shiftObj.totalPeople += people;
+        if (total > 0) {
+          shiftObj.totalPeople += people;
+        }
 
         const pInfo = salePaymentMap[sale.id];
         if (pInfo && (pInfo.cash > 0 || pInfo.digital > 0)) {
@@ -300,7 +305,9 @@ export async function POST(request: Request) {
       if (shift === 'MEDIODIA') todayMediodia += total;
       else todayNoche += total;
 
-      todayPeople += people;
+      if (total > 0) {
+        todayPeople += people;
+      }
       todayOrders += 1;
 
       const pInfo = salePaymentMap[sale.id];
@@ -363,7 +370,9 @@ export async function POST(request: Request) {
 
       channelMap[targetChannel].totalGross += total;
       channelMap[targetChannel].ordersCount += 1;
-      channelMap[targetChannel].peopleCount += people;
+      if (total > 0) {
+        channelMap[targetChannel].peopleCount += people;
+      }
     });
 
     const channelsSummary = Object.values(channelMap)

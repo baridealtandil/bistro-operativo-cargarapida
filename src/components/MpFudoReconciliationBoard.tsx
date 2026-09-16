@@ -18,7 +18,8 @@ import {
   Layers,
   Check,
   XCircle,
-  HelpCircle
+  HelpCircle,
+  Smartphone
 } from 'lucide-react';
 
 interface MpFudoReconciliationBoardProps {
@@ -37,7 +38,7 @@ export const MpFudoReconciliationBoard: React.FC<MpFudoReconciliationBoardProps>
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<'ALL' | 'RECONCILED' | 'UNMATCHED_FUDO' | 'UNMATCHED_MP' | 'FUDO_CASH' | 'EGRESOS'>('ALL');
+  const [activeTab, setActiveTab] = useState<'ALL' | 'RECONCILED' | 'UNMATCHED_FUDO' | 'UNMATCHED_MP' | 'FUDO_CASH' | 'FUDO_POSNET_CARD' | 'FUDO_PEDIDOSYA_ONLINE' | 'MP_TIP' | 'EGRESOS'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [showExplanation, setShowExplanation] = useState(true);
 
@@ -72,11 +73,25 @@ export const MpFudoReconciliationBoard: React.FC<MpFudoReconciliationBoardProps>
   const kpis = data?.kpis || {};
   const rows: any[] = data?.reconciliationRows || [];
 
-  // Fudo MP Amount: prioritize prop if provided, else KPI from API
+  // Category totals
+  const reconciledRows = useMemo(() => rows.filter(r => r.status === 'RECONCILED'), [rows]);
+  const unmatchedFudoRows = useMemo(() => rows.filter(r => r.status === 'UNMATCHED_FUDO'), [rows]);
+  const unmatchedMpRows = useMemo(() => rows.filter(r => r.status === 'UNMATCHED_MP'), [rows]);
+  const fudoCashRows = useMemo(() => rows.filter(r => r.status === 'FUDO_CASH'), [rows]);
+  const fudoCardRows = useMemo(() => rows.filter(r => r.status === 'FUDO_POSNET_CARD'), [rows]);
+  const fudoPeyaRows = useMemo(() => rows.filter(r => r.status === 'FUDO_PEDIDOSYA_ONLINE'), [rows]);
+  const mpTipRows = useMemo(() => rows.filter(r => r.status === 'MP_TIP'), [rows]);
+  const egresosRows = useMemo(() => rows.filter(r => r.status === 'EGRESO_MP'), [rows]);
+
+  const reconciledTotal = useMemo(() => reconciledRows.reduce((sum, r) => sum + (r.fudoTotal || 0), 0), [reconciledRows]);
+  const unmatchedFudoTotal = useMemo(() => unmatchedFudoRows.reduce((sum, r) => sum + (r.fudoTotal || 0), 0), [unmatchedFudoRows]);
+  const unmatchedMpTotal = useMemo(() => unmatchedMpRows.reduce((sum, r) => sum + (r.mpGross || 0), 0), [unmatchedMpRows]);
+  const fudoCashTotal = useMemo(() => fudoCashRows.reduce((sum, r) => sum + (r.fudoTotal || 0), 0), [fudoCashRows]);
+
+  // Fudo MP QR Declared Amount
   const fudoMpDeclared = fudoMpSalesAmount !== undefined 
     ? fudoMpSalesAmount 
-    : rows.filter(r => r.status === 'RECONCILED' || r.status === 'UNMATCHED_FUDO')
-          .reduce((acc, r) => acc + (r.fudoTotal || 0), 0);
+    : (reconciledTotal + unmatchedFudoTotal);
 
   const mpGrossTotal = kpis.mpGrossTotal || 0;
   const mpNetTotal = kpis.mpNetTotal || 0;
@@ -85,21 +100,9 @@ export const MpFudoReconciliationBoard: React.FC<MpFudoReconciliationBoardProps>
   const mpEgresosTotal = kpis.mpEgresosTotal || 0;
   const totalDeductions = mpFeesTotal + mpTaxesTotal;
 
-  // Direct gap / difference
-  const difference = fudoMpDeclared - mpGrossTotal;
-  const isBalanced = Math.abs(difference) < 1;
-
-  // Category totals
-  const reconciledRows = useMemo(() => rows.filter(r => r.status === 'RECONCILED'), [rows]);
-  const unmatchedFudoRows = useMemo(() => rows.filter(r => r.status === 'UNMATCHED_FUDO'), [rows]);
-  const unmatchedMpRows = useMemo(() => rows.filter(r => r.status === 'UNMATCHED_MP'), [rows]);
-  const fudoCashRows = useMemo(() => rows.filter(r => r.status === 'FUDO_CASH'), [rows]);
-  const egresosRows = useMemo(() => rows.filter(r => r.status === 'EGRESO_MP'), [rows]);
-
-  const reconciledTotal = useMemo(() => reconciledRows.reduce((sum, r) => sum + (r.fudoTotal || 0), 0), [reconciledRows]);
-  const unmatchedFudoTotal = useMemo(() => unmatchedFudoRows.reduce((sum, r) => sum + (r.fudoTotal || 0), 0), [unmatchedFudoRows]);
-  const unmatchedMpTotal = useMemo(() => unmatchedMpRows.reduce((sum, r) => sum + (r.mpGross || 0), 0), [unmatchedMpRows]);
-  const fudoCashTotal = useMemo(() => fudoCashRows.reduce((sum, r) => sum + (r.fudoTotal || 0), 0), [fudoCashRows]);
+  // Real QR gap / difference
+  const difference = unmatchedFudoTotal;
+  const isBalanced = unmatchedFudoRows.length === 0;
 
   // Filtered rows for drilldown table
   const filteredRows = useMemo(() => {
@@ -108,16 +111,20 @@ export const MpFudoReconciliationBoard: React.FC<MpFudoReconciliationBoardProps>
       if (activeTab === 'UNMATCHED_FUDO' && r.status !== 'UNMATCHED_FUDO') return false;
       if (activeTab === 'UNMATCHED_MP' && r.status !== 'UNMATCHED_MP') return false;
       if (activeTab === 'FUDO_CASH' && r.status !== 'FUDO_CASH') return false;
+      if (activeTab === 'FUDO_POSNET_CARD' && r.status !== 'FUDO_POSNET_CARD') return false;
+      if (activeTab === 'FUDO_PEDIDOSYA_ONLINE' && r.status !== 'FUDO_PEDIDOSYA_ONLINE') return false;
+      if (activeTab === 'MP_TIP' && r.status !== 'MP_TIP') return false;
       if (activeTab === 'EGRESOS' && r.status !== 'EGRESO_MP') return false;
 
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const matchFudoId = r.fudoSaleId ? String(r.fudoSaleId).toLowerCase().includes(q) : false;
         const matchMpId = r.mpPaymentId ? String(r.mpPaymentId).toLowerCase().includes(q) : false;
+        const matchPm = r.fudoPmName ? String(r.fudoPmName).toLowerCase().includes(q) : false;
         const matchDevice = r.mpDevice ? String(r.mpDevice).toLowerCase().includes(q) : false;
         const matchDesc = r.mpDescription ? String(r.mpDescription).toLowerCase().includes(q) : false;
         const matchAmount = (r.fudoTotal || r.mpGross || 0).toString().includes(q);
-        return matchFudoId || matchMpId || matchDevice || matchDesc || matchAmount;
+        return matchFudoId || matchMpId || matchPm || matchDevice || matchDesc || matchAmount;
       }
       return true;
     });
@@ -252,18 +259,14 @@ export const MpFudoReconciliationBoard: React.FC<MpFudoReconciliationBoardProps>
           <div className={`text-2xl font-black ${
             isBalanced 
               ? 'text-emerald-400' 
-              : difference > 0 
-                ? 'text-amber-400' 
-                : 'text-rose-400'
+              : 'text-amber-400'
           }`}>
-            {difference > 0 ? `+` : ''}${difference.toLocaleString('es-AR')}
+            ${difference.toLocaleString('es-AR')}
           </div>
           <div className="text-[11px] text-slate-300 font-medium">
             {isBalanced 
-              ? 'Ventas Fudo coinciden 100% con MP' 
-              : difference > 0 
-                ? 'Fudo registra más MP que lo cobrado en MP' 
-                : 'Mercado Pago cobró más de lo registrado en Fudo'}
+              ? 'Ventas Fudo QR coinciden 100% con MP' 
+              : `${unmatchedFudoRows.length} comandas QR en Fudo sin acreditación MP`}
           </div>
         </div>
       </div>
@@ -379,7 +382,29 @@ export const MpFudoReconciliationBoard: React.FC<MpFudoReconciliationBoardProps>
                   : 'text-slate-400 hover:text-white hover:bg-slate-900'
               }`}
             >
-              Descalce MP 🔴 ({unmatchedFudoRows.length})
+              Descalce QR 🔴 ({unmatchedFudoRows.length})
+            </button>
+
+            <button
+              onClick={() => setActiveTab('FUDO_POSNET_CARD')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                activeTab === 'FUDO_POSNET_CARD'
+                  ? 'bg-sky-600 text-white shadow-md'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-900'
+              }`}
+            >
+              Tarjetas Posnet 💳 ({fudoCardRows.length})
+            </button>
+
+            <button
+              onClick={() => setActiveTab('FUDO_PEDIDOSYA_ONLINE')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                activeTab === 'FUDO_PEDIDOSYA_ONLINE'
+                  ? 'bg-amber-600 text-white shadow-md'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-900'
+              }`}
+            >
+              PedidosYa Online 🛵 ({fudoPeyaRows.length})
             </button>
 
             <button
@@ -391,6 +416,17 @@ export const MpFudoReconciliationBoard: React.FC<MpFudoReconciliationBoardProps>
               }`}
             >
               Efectivo Fudo 💵 ({fudoCashRows.length})
+            </button>
+
+            <button
+              onClick={() => setActiveTab('MP_TIP')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                activeTab === 'MP_TIP'
+                  ? 'bg-amber-500 text-slate-950 shadow-md'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-900'
+              }`}
+            >
+              Propinas MP 🪙 ({mpTipRows.length})
             </button>
 
             <button
@@ -456,6 +492,9 @@ export const MpFudoReconciliationBoard: React.FC<MpFudoReconciliationBoardProps>
                   const isUnmatchedFudo = row.status === 'UNMATCHED_FUDO';
                   const isUnmatchedMp = row.status === 'UNMATCHED_MP';
                   const isFudoCash = row.status === 'FUDO_CASH';
+                  const isFudoCard = row.status === 'FUDO_POSNET_CARD';
+                  const isFudoPeya = row.status === 'FUDO_PEDIDOSYA_ONLINE';
+                  const isMpTip = row.status === 'MP_TIP';
                   const isEgreso = row.status === 'EGRESO_MP';
 
                   return (
@@ -475,12 +514,27 @@ export const MpFudoReconciliationBoard: React.FC<MpFudoReconciliationBoardProps>
                         )}
                         {isUnmatchedFudo && (
                           <span className="inline-flex items-center gap-1 bg-rose-500/20 text-rose-300 border border-rose-500/30 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                            <AlertCircle className="w-3 h-3 text-rose-400" /> Descalce MP
+                            <AlertCircle className="w-3 h-3 text-rose-400" /> Descalce QR
+                          </span>
+                        )}
+                        {isFudoCard && (
+                          <span className="inline-flex items-center gap-1 bg-sky-500/20 text-sky-300 border border-sky-500/30 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                            <CreditCard className="w-3 h-3 text-sky-400" /> Posnet {row.fudoPmName}
+                          </span>
+                        )}
+                        {isFudoPeya && (
+                          <span className="inline-flex items-center gap-1 bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                            <Smartphone className="w-3 h-3 text-amber-400" /> PedidosYa Online
                           </span>
                         )}
                         {isFudoCash && (
                           <span className="inline-flex items-center gap-1 bg-slate-800 text-emerald-300 border border-slate-700 text-[10px] font-bold px-2 py-0.5 rounded-full">
                             <DollarSign className="w-3 h-3 text-emerald-400" /> Efectivo Fudo
+                          </span>
+                        )}
+                        {isMpTip && (
+                          <span className="inline-flex items-center gap-1 bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                            <DollarSign className="w-3 h-3 text-amber-400" /> Propina MP
                           </span>
                         )}
                         {isUnmatchedMp && (

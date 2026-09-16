@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getStatementEgresosForRange } from '@/utils/mpStatementData';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 const MP_BASE = 'https://api.mercadopago.com';
 const FUDO_AUTH_URL = 'https://auth.fu.do/api';
 const FUDO_API_BASE = 'https://api.fu.do/v1alpha1';
@@ -346,7 +349,7 @@ export async function POST(request: Request) {
       const sEndStr = sEndObj.toISOString().split('T')[0];
 
       let allFudoSales: any[] = [];
-      const salePaymentMethodMap: Record<string, string> = {};
+      const salePaymentsMap: Record<string, Array<{ amount: number; pmName: string }>> = {};
       let fPage = 1;
       let fHasMore = true;
 
@@ -368,9 +371,13 @@ export async function POST(request: Request) {
           if (inc.type === 'Payment') {
             const saleId = inc.relationships?.sale?.data?.id;
             const pmId = inc.relationships?.paymentMethod?.data?.id;
+            const amount = Number(inc.attributes?.amount || 0);
             if (saleId && pmId) {
               const pmName = FUDO_PM_NAMES[String(pmId)] || 'Efectivo';
-              salePaymentMethodMap[String(saleId)] = pmName;
+              if (!salePaymentsMap[String(saleId)]) {
+                salePaymentsMap[String(saleId)] = [];
+              }
+              salePaymentsMap[String(saleId)].push({ amount, pmName });
             }
           }
         });
@@ -385,7 +392,18 @@ export async function POST(request: Request) {
         .map((s: any) => {
           const createdAt = s.attributes?.createdAt || '';
           const { dateStr, artHour, shift } = getArgentinaDateTime(createdAt);
-          const fudoPmName = salePaymentMethodMap[String(s.id)] || 'Efectivo';
+          const payments = salePaymentsMap[String(s.id)] || [];
+          
+          let fudoPmName = 'Efectivo';
+          if (payments.length > 0) {
+            const digitalPayments = payments.filter((p: any) => p.pmName !== 'Efectivo');
+            if (digitalPayments.length > 0) {
+              fudoPmName = digitalPayments.map((p: any) => p.pmName).join(', ');
+            } else {
+              fudoPmName = 'Efectivo';
+            }
+          }
+
           return {
             id: String(s.id),
             createdAt,
@@ -396,6 +414,7 @@ export async function POST(request: Request) {
             total: Number(s.attributes?.total || 0),
             people: Number(s.attributes?.people || 0),
             fudoPaymentMethod: fudoPmName,
+            payments,
           };
         })
         .filter((s: any) => s.rawDateStr >= startDate && s.rawDateStr <= endDate);
@@ -406,81 +425,131 @@ export async function POST(request: Request) {
     const reconciliationRows: any[] = [];
 
     fudoDigitalSales.forEach(fudoSale => {
-      const match = parsedIncomes.find(mp => {
-        if (mpUsedIds.has(mp.id)) return false;
-        if (Math.abs(mp.grossAmount - fudoSale.total) < 1) {
-          if (mp.rawDateStr === fudoSale.rawDateStr) return true;
+      const payments = fudoSale.payments || [];
+      const hasSplitPayments = payments.length > 1;
+
+      // Iterate through each payment record in the sale
+      const targetPayments = payments.length > 0 ? payments : [{ amount: fudoSale.total, pmName: fudoSale.fudoPaymentMethod }];
+
+      targetPayments.forEach((fp: any, pIdx: number) => {
+        const pmName = fp.pmName || 'Efectivo';
+        const fpAmount = Number(fp.amount || fudoSale.total);
+
+        const fudoTime = new Date(fudoSale.createdAt).getTime();
+
+        // Try to match against an MP Income (supports same date or midnight crossing within 6 hours)
+        const match = parsedIncomes.find(mp => {
+          if (mpUsedIds.has(mp.id)) return false;
+          if (Math.abs(mp.grossAmount - fpAmount) <= 1) {
+            const mpTime = new Date(mp.dateCreated).getTime();
+            const diffHours = Math.abs(fudoTime - mpTime) / (3600 * 1000);
+            if (diffHours <= 6 || mp.rawDateStr === fudoSale.rawDateStr) return true;
+          }
+          return false;
+        });
+
+        if (match) {
+          mpUsedIds.add(match.id);
+          reconciliationRows.push({
+            status: 'RECONCILED',
+            fudoSaleId: hasSplitPayments ? `${fudoSale.id} (Pago ${pIdx + 1})` : fudoSale.id,
+            fudoTotal: fpAmount,
+            fudoShift: fudoSale.shift,
+            fudoDate: fudoSale.dateStr,
+            fudoPmName: pmName,
+            mpPaymentId: match.id,
+            mpGross: match.grossAmount,
+            mpNet: match.netAmount,
+            mpFee: match.feeAmount,
+            mpTax: match.taxAmount,
+            mpDevice: match.deviceLabel,
+            mpDate: match.dateStr,
+            mpDescription: `Conciliado Acreditado (${pmName})`,
+          });
+        } else if (pmName.toLowerCase().includes('efectivo')) {
+          reconciliationRows.push({
+            status: 'FUDO_CASH',
+            fudoSaleId: hasSplitPayments ? `${fudoSale.id} (Pago ${pIdx + 1})` : fudoSale.id,
+            fudoTotal: fpAmount,
+            fudoShift: fudoSale.shift,
+            fudoDate: fudoSale.dateStr,
+            fudoPmName: pmName,
+            mpPaymentId: null,
+            mpGross: 0,
+            mpNet: 0,
+            mpFee: 0,
+            mpTax: 0,
+            mpDevice: 'N/A',
+            mpDate: fudoSale.dateStr,
+            mpDescription: 'Venta Efectivo en Fudo',
+          });
+        } else if (pmName.includes('Online Pedidos Ya') || pmName.includes('Pedidos Ya')) {
+          reconciliationRows.push({
+            status: 'FUDO_PEDIDOSYA_ONLINE',
+            fudoSaleId: hasSplitPayments ? `${fudoSale.id} (Pago ${pIdx + 1})` : fudoSale.id,
+            fudoTotal: fpAmount,
+            fudoShift: fudoSale.shift,
+            fudoDate: fudoSale.dateStr,
+            fudoPmName: pmName,
+            mpPaymentId: null,
+            mpGross: 0,
+            mpNet: 0,
+            mpFee: 0,
+            mpTax: 0,
+            mpDevice: 'Plataforma PedidosYa',
+            mpDate: fudoSale.dateStr,
+            mpDescription: 'Cobro Plataforma Online PedidosYa',
+          });
+        } else if (pmName.includes('Tarj. Débito') || pmName.includes('Tarj. Crédito')) {
+          reconciliationRows.push({
+            status: 'FUDO_POSNET_CARD',
+            fudoSaleId: hasSplitPayments ? `${fudoSale.id} (Pago ${pIdx + 1})` : fudoSale.id,
+            fudoTotal: fpAmount,
+            fudoShift: fudoSale.shift,
+            fudoDate: fudoSale.dateStr,
+            fudoPmName: pmName,
+            mpPaymentId: null,
+            mpGross: 0,
+            mpNet: 0,
+            mpFee: 0,
+            mpTax: 0,
+            mpDevice: 'Posnet Físico Tradicional',
+            mpDate: fudoSale.dateStr,
+            mpDescription: `Cobro por Posnet Físico (${pmName})`,
+          });
+        } else {
+          // True QR / Mercado Pago Descalce in Fudo
+          reconciliationRows.push({
+            status: 'UNMATCHED_FUDO',
+            fudoSaleId: hasSplitPayments ? `${fudoSale.id} (Pago ${pIdx + 1})` : fudoSale.id,
+            fudoTotal: fpAmount,
+            fudoShift: fudoSale.shift,
+            fudoDate: fudoSale.dateStr,
+            fudoPmName: pmName,
+            mpPaymentId: null,
+            mpGross: 0,
+            mpNet: 0,
+            mpFee: 0,
+            mpTax: 0,
+            mpDevice: 'N/A',
+            mpDate: fudoSale.dateStr,
+            mpDescription: `Pago ${pmName} en Fudo sin acreditación MP`,
+          });
         }
-        return false;
       });
-
-      const isCashSale = fudoSale.fudoPaymentMethod === 'Efectivo';
-
-      if (match) {
-        mpUsedIds.add(match.id);
-        reconciliationRows.push({
-          status: 'RECONCILED',
-          fudoSaleId: fudoSale.id,
-          fudoTotal: fudoSale.total,
-          fudoShift: fudoSale.shift,
-          fudoDate: fudoSale.dateStr,
-          mpPaymentId: match.id,
-          mpGross: match.grossAmount,
-          mpNet: match.netAmount,
-          mpFee: match.feeAmount,
-          mpTax: match.taxAmount,
-          mpDevice: match.deviceLabel,
-          mpDate: match.dateStr,
-          mpDescription: isCashSale 
-            ? 'Conciliado (Cargado en Fudo como Efectivo, Cobrado en MP)'
-            : match.description,
-        });
-      } else if (isCashSale) {
-        // Legitimate Fudo Cash Sale - NOT an MP descalce
-        reconciliationRows.push({
-          status: 'FUDO_CASH',
-          fudoSaleId: fudoSale.id,
-          fudoTotal: fudoSale.total,
-          fudoShift: fudoSale.shift,
-          fudoDate: fudoSale.dateStr,
-          mpPaymentId: null,
-          mpGross: 0,
-          mpNet: 0,
-          mpFee: 0,
-          mpTax: 0,
-          mpDevice: 'N/A',
-          mpDate: fudoSale.dateStr,
-          mpDescription: 'Venta Efectivo (Fudo)',
-        });
-      } else {
-        // Declared in Fudo as MP/Digital, but NOT received in MP API - True MP Descalce
-        reconciliationRows.push({
-          status: 'UNMATCHED_FUDO',
-          fudoSaleId: fudoSale.id,
-          fudoTotal: fudoSale.total,
-          fudoShift: fudoSale.shift,
-          fudoDate: fudoSale.dateStr,
-          mpPaymentId: null,
-          mpGross: 0,
-          mpNet: 0,
-          mpFee: 0,
-          mpTax: 0,
-          mpDevice: 'N/A',
-          mpDate: fudoSale.dateStr,
-          mpDescription: `Venta ${fudoSale.fudoPaymentMethod} en Fudo sin acreditación MP`,
-        });
-      }
     });
 
     // Add remaining unmatched MP Incomes
     parsedIncomes.forEach(mp => {
       if (!mpUsedIds.has(mp.id)) {
+        const isTip = mp.description === 'Propina' || mp.reason === 'Propina';
         reconciliationRows.push({
-          status: 'UNMATCHED_MP',
+          status: isTip ? 'MP_TIP' : 'UNMATCHED_MP',
           fudoSaleId: null,
           fudoTotal: 0,
           fudoShift: mp.shift,
           fudoDate: mp.dateStr,
+          fudoPmName: 'Mercado Pago',
           mpPaymentId: mp.id,
           mpGross: mp.grossAmount,
           mpNet: mp.netAmount,
@@ -488,7 +557,7 @@ export async function POST(request: Request) {
           mpTax: mp.taxAmount,
           mpDevice: mp.deviceLabel,
           mpDate: mp.dateStr,
-          mpDescription: mp.description,
+          mpDescription: isTip ? 'Propina Registrada en Posnet MP' : mp.description,
         });
       }
     });
@@ -501,6 +570,7 @@ export async function POST(request: Request) {
         fudoTotal: 0,
         fudoShift: eg.shift,
         fudoDate: eg.dateStr,
+        fudoPmName: 'Transferencia MP',
         mpPaymentId: eg.id,
         mpGross: eg.grossAmount,
         mpNet: eg.grossAmount,
