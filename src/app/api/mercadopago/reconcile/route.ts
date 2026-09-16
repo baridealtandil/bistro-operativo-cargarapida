@@ -54,12 +54,28 @@ async function getMercadoPagoOAuthToken(): Promise<string> {
 }
 
 function getArgentinaDateTime(isoDateString: string): { dateStr: string; artHour: number; shift: 'MEDIODIA' | 'NOCHE' } {
+  if (!isoDateString) return { dateStr: '', artHour: 0, shift: 'MEDIODIA' };
   const d = new Date(isoDateString);
-  const artMs = d.getTime() - (3 * 3600 * 1000);
-  const artDate = new Date(artMs);
-  const dateStr = artDate.toISOString().split('T')[0];
-  const artHour = artDate.getUTCHours();
+  if (isNaN(d.getTime())) return { dateStr: '', artHour: 0, shift: 'MEDIODIA' };
+
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Argentina/Buenos_Aires',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+
+  const parts = formatter.formatToParts(d);
+  const map: Record<string, string> = {};
+  parts.forEach(p => { map[p.type] = p.value; });
+
+  const dateStr = `${map.year}-${map.month}-${map.day}`;
+  const artHour = parseInt(map.hour, 10);
   const shift = (artHour >= 7 && artHour < 18) ? 'MEDIODIA' : 'NOCHE';
+
   return { dateStr, artHour, shift };
 }
 
@@ -74,12 +90,13 @@ function formatShortDate(dateStr: string): string {
 }
 
 function getArgentinaTodayStr(d = new Date()): string {
-  const artMs = d.getTime() - (3 * 3600 * 1000);
-  const artDate = new Date(artMs);
-  const year = artDate.getUTCFullYear();
-  const month = String(artDate.getUTCMonth() + 1).padStart(2, '0');
-  const day = String(artDate.getUTCDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Argentina/Buenos_Aires',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+  return formatter.format(d);
 }
 
 let cachedFudoToken: string | null = null;
@@ -140,17 +157,15 @@ export async function POST(request: Request) {
       email: meData.email || 'mpagocantina@gmail.com',
     };
 
-    // 2. Fetch Mercado Pago Payments (Dual search: Collector + Payer)
+    // 2. Fetch Mercado Pago Payments without search date param bug
     const paymentsMap = new Map<string, any>();
     const limit = 100;
-    const beginDateIso = `${startDate}T00:00:00.000-03:00`;
-    const endDateIso = `${endDate}T23:59:59.999-03:00`;
 
-    // Query 1: Collector Payments (Incomes)
+    // Query 1: Collector Payments (Incomes & Point Smart)
     let offset = 0;
     let hasMoreMP = true;
-    while (hasMoreMP && offset < 500) {
-      const searchUrl = `${MP_BASE}/v1/payments/search?sort=date_created&criteria=desc&begin_date=${beginDateIso}&end_date=${endDateIso}&limit=${limit}&offset=${offset}`;
+    while (hasMoreMP && offset < 1000) {
+      const searchUrl = `${MP_BASE}/v1/payments/search?sort=date_created&criteria=desc&limit=${limit}&offset=${offset}`;
       const mpRes = await fetch(searchUrl, {
         headers: { 'Authorization': `Bearer ${mpToken}` }
       });
@@ -160,15 +175,24 @@ export async function POST(request: Request) {
       const results = mpData.results || [];
       results.forEach((p: any) => paymentsMap.set(String(p.id), p));
 
-      if (results.length < limit) hasMoreMP = false;
-      else offset += limit;
+      if (results.length < limit) {
+        hasMoreMP = false;
+      } else {
+        const oldestIso = results[results.length - 1].date_created;
+        const { dateStr } = getArgentinaDateTime(oldestIso);
+        if (dateStr < startDate) {
+          hasMoreMP = false;
+        } else {
+          offset += limit;
+        }
+      }
     }
 
-    // Query 2: Payer Payments (Egresos: Personal, Sueldos, Suscripciones, Transferencias)
+    // Query 2: Payer Payments (Egresos: Personal, Sueldos, Transferencias)
     offset = 0;
     hasMoreMP = true;
     while (hasMoreMP && offset < 500) {
-      const searchUrl = `${MP_BASE}/v1/payments/search?sort=date_created&criteria=desc&begin_date=${beginDateIso}&end_date=${endDateIso}&limit=${limit}&offset=${offset}&payer.id=836632087`;
+      const searchUrl = `${MP_BASE}/v1/payments/search?sort=date_created&criteria=desc&limit=${limit}&offset=${offset}&payer.id=836632087`;
       const mpRes = await fetch(searchUrl, {
         headers: { 'Authorization': `Bearer ${mpToken}` }
       });
@@ -437,13 +461,13 @@ export async function POST(request: Request) {
 
         const fudoTime = new Date(fudoSale.createdAt).getTime();
 
-        // Try to match against an MP Income (supports same date or midnight crossing within 6 hours)
+        // Try to match against an MP Income (supports same date or shift/midnight crossing within 12 hours)
         const match = parsedIncomes.find(mp => {
           if (mpUsedIds.has(mp.id)) return false;
           if (Math.abs(mp.grossAmount - fpAmount) <= 1) {
             const mpTime = new Date(mp.dateCreated).getTime();
             const diffHours = Math.abs(fudoTime - mpTime) / (3600 * 1000);
-            if (diffHours <= 6 || mp.rawDateStr === fudoSale.rawDateStr) return true;
+            if (diffHours <= 12 || mp.rawDateStr === fudoSale.rawDateStr) return true;
           }
           return false;
         });
