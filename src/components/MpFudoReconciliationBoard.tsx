@@ -333,17 +333,17 @@ export const MpFudoReconciliationBoard: React.FC<MpFudoReconciliationBoardProps>
               </div>
             </div>
 
-            {/* Posnet Tradicional (Payway / Fiserv) */}
+            {/* Tarjetas sin cobro en MP (Posible Efectivo / Error Selección) */}
             <div className="bg-purple-950/30 border border-purple-500/30 p-3 rounded-xl space-y-1">
               <div className="font-bold text-purple-300 flex items-center gap-1.5">
                 <CreditCard className="w-3.5 h-3.5 text-purple-400" />
-                Posnet Tradicional (Payway/Fiserv)
+                Tarjetas s/ Cobro MP (Posible Efectivo)
               </div>
               <div className="text-lg font-black text-white">
                 ${posnetOtherTotal.toLocaleString('es-AR')}
               </div>
               <div className="text-[10px] text-slate-400">
-                {posnetOtherRows.length} ventas por tarjetas/medios no-MP.
+                {posnetOtherRows.length} ventas declaradas como Tarjeta sin cobro en MP (Error / Cobrado en Efectivo).
               </div>
             </div>
 
@@ -435,7 +435,7 @@ export const MpFudoReconciliationBoard: React.FC<MpFudoReconciliationBoardProps>
                   : 'text-slate-400 hover:text-white hover:bg-slate-900'
               }`}
             >
-              Posnet Tradicional 💳 ({posnetOtherRows.length})
+              Tarjetas s/ MP 💳 ({posnetOtherRows.length})
             </button>
 
             <button
@@ -555,7 +555,7 @@ export const MpFudoReconciliationBoard: React.FC<MpFudoReconciliationBoardProps>
                         )}
                         {isPosnetOther && (
                           <span className="inline-flex items-center gap-1 bg-purple-500/10 text-purple-300 border border-purple-500/20 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                            💳 Posnet Tradicional
+                            💳 Tarjeta s/ MP (Posible Efectivo)
                           </span>
                         )}
                         {isFudoCash && (
