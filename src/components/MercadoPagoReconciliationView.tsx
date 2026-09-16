@@ -256,17 +256,17 @@ export default function MercadoPagoReconciliationView({
       )}
 
       {/* 5 Executive Movement Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
         
         {/* TARJETA 1: DINERO EN CUENTA (Oficial App MP Coincidencia Exacta) */}
         <div className="bg-slate-900 rounded-2xl p-4 border border-blue-500/40 shadow-xl flex flex-col justify-between">
           <div className="flex items-center justify-between text-blue-400 text-xs font-semibold uppercase tracking-wider mb-2">
             <span>Dinero en Cuenta MP</span>
-            <Wallet className="w-5 h-5 text-blue-400" />
+            <Wallet className="w-5 h-5 text-blue-400 shrink-0" />
           </div>
           <div className="space-y-1">
             <div className="text-xs text-slate-400 font-medium">Disponible en Pesos:</div>
-            <div className="text-2xl font-black text-white tracking-tight">
+            <div className="text-xl xl:text-2xl font-black text-white tracking-tight">
               ${availableBal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
             </div>
             <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-[11px]">
@@ -288,13 +288,13 @@ export default function MercadoPagoReconciliationView({
         <div className="bg-slate-900 rounded-2xl p-4 border border-slate-800 shadow-xl flex flex-col justify-between">
           <div className="flex items-center justify-between text-emerald-400 text-xs font-semibold uppercase tracking-wider mb-2">
             <span>Ventas del Período</span>
-            <ArrowUpRight className="w-5 h-5 text-emerald-400" />
+            <ArrowUpRight className="w-5 h-5 text-emerald-400 shrink-0" />
           </div>
           <div>
-            <div className="text-2xl font-bold text-white">
+            <div className="text-xl xl:text-2xl font-bold text-white">
               ${(kpis.mpGrossTotal || 0).toLocaleString('es-AR')} <span className="text-xs font-medium text-slate-400">Bruto</span>
             </div>
-            <div className="text-lg font-semibold text-emerald-400 mt-1">
+            <div className="text-base xl:text-lg font-semibold text-emerald-400 mt-1">
               ${(kpis.mpNetTotal || 0).toLocaleString('es-AR')} <span className="text-xs font-normal text-emerald-300/70">Neto Limpio</span>
             </div>
           </div>
@@ -307,7 +307,7 @@ export default function MercadoPagoReconciliationView({
         <div className="bg-slate-900 rounded-2xl p-4 border border-slate-800 shadow-xl flex flex-col justify-between">
           <div className="flex items-center justify-between text-indigo-400 text-xs font-semibold uppercase tracking-wider mb-2">
             <span>Métodos de Pago</span>
-            <PieChart className="w-5 h-5 text-indigo-400" />
+            <PieChart className="w-5 h-5 text-indigo-400 shrink-0" />
           </div>
           <div className="space-y-2 text-xs">
             {Object.entries(paymentMethods).map(([key, m]: [string, any]) => {
@@ -342,7 +342,7 @@ export default function MercadoPagoReconciliationView({
                 <Info className="w-3.5 h-3.5" />
               </button>
             </span>
-            <Receipt className="w-5 h-5 text-amber-400" />
+            <Receipt className="w-5 h-5 text-amber-400 shrink-0" />
           </div>
           <div className="space-y-1.5 text-xs">
             <div className="flex justify-between">
@@ -377,11 +377,11 @@ export default function MercadoPagoReconciliationView({
                 <Info className="w-3.5 h-3.5" />
               </button>
             </span>
-            <ArrowDownLeft className="w-5 h-5 text-rose-400" />
+            <ArrowDownLeft className="w-5 h-5 text-rose-400 shrink-0" />
           </div>
 
           <div>
-            <div className="text-lg sm:text-xl xl:text-2xl font-black text-rose-400 tracking-tight truncate" title={`-$${totalConsolidatedEgresos.toLocaleString('es-AR')}`}>
+            <div className="text-lg xl:text-xl font-black text-rose-400 tracking-tight leading-snug">
               -${totalConsolidatedEgresos.toLocaleString('es-AR')}
             </div>
             
