@@ -165,7 +165,7 @@ export async function POST(request: Request) {
     let offset = 0;
     let hasMoreMP = true;
     while (hasMoreMP && offset < 1000) {
-      const searchUrl = `${MP_BASE}/v1/payments/search?sort=date_created&criteria=desc&limit=${limit}&offset=${offset}`;
+      const searchUrl = `${MP_BASE}/v1/payments/search?collector.id=${accountInfo.id}&sort=date_created&criteria=desc&limit=${limit}&offset=${offset}`;
       const mpRes = await fetch(searchUrl, {
         headers: { 'Authorization': `Bearer ${mpToken}` }
       });
