@@ -87,6 +87,8 @@ export const MpFudoReconciliationBoard: React.FC<MpFudoReconciliationBoardProps>
   const unmatchedFudoTotal = useMemo(() => unmatchedFudoRows.reduce((sum, r) => sum + (r.fudoTotal || 0), 0), [unmatchedFudoRows]);
   const unmatchedMpTotal = useMemo(() => unmatchedMpRows.reduce((sum, r) => sum + (r.mpGross || 0), 0), [unmatchedMpRows]);
   const fudoCashTotal = useMemo(() => fudoCashRows.reduce((sum, r) => sum + (r.fudoTotal || 0), 0), [fudoCashRows]);
+  const fudoCardTotal = useMemo(() => fudoCardRows.reduce((sum, r) => sum + (r.fudoTotal || 0), 0), [fudoCardRows]);
+  const fudoPeyaTotal = useMemo(() => fudoPeyaRows.reduce((sum, r) => sum + (r.fudoTotal || 0), 0), [fudoPeyaRows]);
 
   // Fudo MP QR Declared Amount
   const fudoMpDeclared = fudoMpSalesAmount !== undefined 
@@ -141,7 +143,7 @@ export const MpFudoReconciliationBoard: React.FC<MpFudoReconciliationBoardProps>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <h3 className="text-lg font-black text-white tracking-tight">
-                Tablero de Conciliación: Ventas Fudo MP ↔ Cobros Mercado Pago
+                Tablero de Conciliación: Ventas Fudo QR ↔ Cobros Mercado Pago
               </h3>
               {loading ? (
                 <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1">
@@ -153,12 +155,12 @@ export const MpFudoReconciliationBoard: React.FC<MpFudoReconciliationBoardProps>
                 </span>
               ) : (
                 <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                  <AlertCircle className="w-3.5 h-3.5 text-amber-400" /> Descalce Registrado: ${Math.abs(difference).toLocaleString('es-AR')}
+                  <AlertCircle className="w-3.5 h-3.5 text-amber-400" /> Descalce QR: ${Math.abs(difference).toLocaleString('es-AR')}
                 </span>
               )}
             </div>
             <p className="text-xs text-slate-400 mt-1">
-              Verificación directa entre lo facturado en caja como Mercado Pago y los dineros reales recibidos en la cuenta de MP
+              Verificación directa entre cobros marcados como Mercado Pago QR en caja y las acreditaciones reales en MP
             </p>
           </div>
         </div>
@@ -182,23 +184,21 @@ export const MpFudoReconciliationBoard: React.FC<MpFudoReconciliationBoardProps>
 
       {/* 4 CORE KPI CARDS OF CONCILIATION */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* 1. FUDO MP SALES */}
+        {/* 1. FUDO MP QR SALES */}
         <div className="bg-slate-950 p-4 rounded-2xl border border-sky-500/40 relative overflow-hidden space-y-2 shadow-lg">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-              <CreditCard className="w-4 h-4 text-sky-400" /> Ventas Fudo (MP)
+              <CreditCard className="w-4 h-4 text-sky-400" /> Ventas Fudo (QR MP)
             </span>
             <span className="text-[10px] bg-sky-500/20 text-sky-300 font-bold px-2 py-0.5 rounded-full">
-              Fudo POS
+              Fudo QR
             </span>
           </div>
           <div className="text-2xl font-black text-sky-400">
             ${fudoMpDeclared.toLocaleString('es-AR')}
           </div>
           <div className="text-[11px] text-slate-400 font-medium">
-            {fudoTotalSalesAmount && fudoTotalSalesAmount > 0 
-              ? `${((fudoMpDeclared / fudoTotalSalesAmount) * 100).toFixed(1)}% del Total Facturado Fudo`
-              : 'Declarado en Caja'}
+            Declarado en Fudo como Mercado Pago QR
           </div>
         </div>
 
@@ -242,13 +242,11 @@ export const MpFudoReconciliationBoard: React.FC<MpFudoReconciliationBoardProps>
         <div className={`bg-slate-950 p-4 rounded-2xl border ${
           isBalanced 
             ? 'border-emerald-500/50' 
-            : difference > 0 
-              ? 'border-amber-500/50' 
-              : 'border-rose-500/50'
+            : 'border-amber-500/50'
         } relative overflow-hidden space-y-2 shadow-lg`}>
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-              <ShieldCheck className="w-4 h-4 text-amber-400" /> Estado / Descalce
+              <ShieldCheck className="w-4 h-4 text-amber-400" /> Descalce QR Fudo ↔ MP
             </span>
             <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
               isBalanced ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'
@@ -277,7 +275,7 @@ export const MpFudoReconciliationBoard: React.FC<MpFudoReconciliationBoardProps>
           <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
             <div className="flex items-center gap-2 text-slate-200 font-bold">
               <Info className="w-4 h-4 text-sky-400" />
-              <span>Análisis Detallado del Estado de Conciliación</span>
+              <span>Análisis Detallado por Medio de Pago Declarado en Fudo</span>
             </div>
             <button
               onClick={() => setShowExplanation(false)}
@@ -287,60 +285,88 @@ export const MpFudoReconciliationBoard: React.FC<MpFudoReconciliationBoardProps>
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 pt-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 pt-1">
             {/* Matched */}
             <div className="bg-emerald-950/30 border border-emerald-500/30 p-3 rounded-xl space-y-1">
-              <div className="font-bold text-emerald-400 flex items-center gap-1.5">
-                <CheckCircle2 className="w-3.5 h-3.5" />
+              <div className="font-bold text-emerald-400 flex items-center gap-1 text-[11px]">
+                <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
                 Ventas Conciliadas 1 a 1
               </div>
-              <div className="text-lg font-black text-white">
+              <div className="text-base font-black text-white">
                 ${reconciledTotal.toLocaleString('es-AR')}
               </div>
               <div className="text-[10px] text-slate-400">
-                {reconciledRows.length} ventas coincidentes en Fudo y Mercado Pago.
+                {reconciledRows.length} ventas QR validadas.
               </div>
             </div>
 
-            {/* Fudo MP without MP */}
+            {/* Fudo MP QR without MP */}
             <div className="bg-rose-950/30 border border-rose-500/30 p-3 rounded-xl space-y-1">
-              <div className="font-bold text-rose-400 flex items-center gap-1.5">
-                <AlertCircle className="w-3.5 h-3.5" />
-                MP Descalce Real (Fudo MP s/ MP)
+              <div className="font-bold text-rose-400 flex items-center gap-1 text-[11px]">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                Descalce Real QR
               </div>
-              <div className="text-lg font-black text-white">
+              <div className="text-base font-black text-white">
                 ${unmatchedFudoTotal.toLocaleString('es-AR')}
               </div>
               <div className="text-[10px] text-slate-400">
-                {unmatchedFudoRows.length} ventas declaradas como MP sin cobro en la cuenta de MP.
+                {unmatchedFudoRows.length} comandas QR sin cobro en MP.
+              </div>
+            </div>
+
+            {/* Tarjetas Posnet (Crédito / Débito) */}
+            <div className="bg-sky-950/30 border border-sky-500/30 p-3 rounded-xl space-y-1">
+              <div className="font-bold text-sky-300 flex items-center gap-1 text-[11px]">
+                <CreditCard className="w-3.5 h-3.5 shrink-0 text-sky-400" />
+                Tarjetas Posnet
+              </div>
+              <div className="text-base font-black text-white">
+                ${fudoCardTotal.toLocaleString('es-AR')}
+              </div>
+              <div className="text-[10px] text-slate-400">
+                {fudoCardRows.length} cobros Posnet (excl. QR).
+              </div>
+            </div>
+
+            {/* PedidosYa Online */}
+            <div className="bg-amber-950/30 border border-amber-500/30 p-3 rounded-xl space-y-1">
+              <div className="font-bold text-amber-300 flex items-center gap-1 text-[11px]">
+                <Smartphone className="w-3.5 h-3.5 shrink-0 text-amber-400" />
+                PedidosYa Online
+              </div>
+              <div className="text-base font-black text-white">
+                ${fudoPeyaTotal.toLocaleString('es-AR')}
+              </div>
+              <div className="text-[10px] text-slate-400">
+                {fudoPeyaRows.length} ventas en app delivery.
               </div>
             </div>
 
             {/* Fudo Cash */}
             <div className="bg-slate-950 border border-slate-700 p-3 rounded-xl space-y-1">
-              <div className="font-bold text-slate-300 flex items-center gap-1.5">
-                <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
-                Ventas Fudo en Efectivo
+              <div className="font-bold text-slate-300 flex items-center gap-1 text-[11px]">
+                <DollarSign className="w-3.5 h-3.5 shrink-0 text-emerald-400" />
+                Efectivo Fudo
               </div>
-              <div className="text-lg font-black text-white">
+              <div className="text-base font-black text-white">
                 ${fudoCashTotal.toLocaleString('es-AR')}
               </div>
               <div className="text-[10px] text-slate-400">
-                {fudoCashRows.length} ventas en efectivo descontadas del cálculo de descalce MP.
+                {fudoCashRows.length} ventas en billetes.
               </div>
             </div>
 
             {/* MP without Fudo */}
-            <div className="bg-sky-950/30 border border-sky-500/30 p-3 rounded-xl space-y-1">
-              <div className="font-bold text-sky-400 flex items-center gap-1.5">
-                <TrendingUp className="w-3.5 h-3.5" />
-                Cobradas en MP s/ Registro Fudo
+            <div className="bg-indigo-950/30 border border-indigo-500/30 p-3 rounded-xl space-y-1">
+              <div className="font-bold text-indigo-300 flex items-center gap-1 text-[11px]">
+                <TrendingUp className="w-3.5 h-3.5 shrink-0 text-indigo-400" />
+                Solo MP (Point/Otros)
               </div>
-              <div className="text-lg font-black text-white">
+              <div className="text-base font-black text-white">
                 ${unmatchedMpTotal.toLocaleString('es-AR')}
               </div>
               <div className="text-[10px] text-slate-400">
-                {unmatchedMpRows.length} cobros en MP no cargados en Fudo POS.
+                {unmatchedMpRows.length} cobros en MP no asignados.
               </div>
             </div>
           </div>

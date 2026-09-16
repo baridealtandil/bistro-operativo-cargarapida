@@ -514,7 +514,6 @@ export const FudoLiveDashboard: React.FC = () => {
           <MpFudoReconciliationBoard
             startDate={data.startDate}
             endDate={data.endDate}
-            fudoMpSalesAmount={data.grandTotals.totalDigitalAmount}
             fudoTotalSalesAmount={data.grandTotals.totalGrossAmount}
           />
 
