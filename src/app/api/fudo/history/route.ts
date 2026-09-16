@@ -112,7 +112,7 @@ export async function POST(request: Request) {
     }
 
     // Map payments strictly by saleId (only payments linked to closed sales)
-    const salePaymentMap: Record<string, { cash: number; digital: number }> = {};
+    const salePaymentMap: Record<string, { cash: number; digital: number; payments: Array<{ amount: number; pmName: string; pmId: string }> }> = {};
     allPayments.forEach((p: any) => {
       const attrs = p.attributes || {};
       if (attrs.canceled) return;
@@ -120,13 +120,15 @@ export async function POST(request: Request) {
       if (!saleId) return; // Ignore unlinked cash drawer movements!
 
       const amount = Number(attrs.amount || 0);
-      const pmId = p.relationships?.paymentMethod?.data?.id;
+      const pmId = String(p.relationships?.paymentMethod?.data?.id || '');
       const pmName = pmId ? (pmMap[pmId] || '') : '';
-      const isCash = pmName.toLowerCase().includes('efectivo');
+      const isCash = pmName.toLowerCase().includes('efectivo') || pmId === '1' || pmId === '9';
 
       if (!salePaymentMap[saleId]) {
-        salePaymentMap[saleId] = { cash: 0, digital: 0 };
+        salePaymentMap[saleId] = { cash: 0, digital: 0, payments: [] };
       }
+
+      salePaymentMap[saleId].payments.push({ amount, pmName, pmId });
 
       if (isCash) {
         salePaymentMap[saleId].cash += amount;
@@ -186,6 +188,12 @@ export async function POST(request: Request) {
         const people = Number(attrs.people || 0);
         const state = attrs.saleState || 'UNKNOWN';
 
+        const pInfo = salePaymentMap[sale.id];
+        let fudoPaymentMethod = 'Efectivo';
+        if (pInfo && pInfo.payments.length > 0) {
+          fudoPaymentMethod = pInfo.payments.map((p: any) => p.pmName).join(', ');
+        }
+
         return {
           id: sale.id,
           createdAt,
@@ -195,6 +203,7 @@ export async function POST(request: Request) {
           total,
           people,
           state,
+          fudoPaymentMethod,
           comment: attrs.comment || '',
         };
       })
@@ -213,20 +222,22 @@ export async function POST(request: Request) {
       digitalAmount: number;
     }> = {};
 
+    // Payment Methods Breakdown (Efectivo, Qr, Tarj. Débito, Tarj. Crédito, Online Pedidos Ya, Efectivo Pedidos Ya, Transferencia, Cta. Cte., Cheque)
+    const pmBreakdownMap: Record<string, { name: string; amount: number; count: number }> = {};
+
     allRawSales.forEach((sale: any) => {
       const attrs = sale.attributes || {};
       const createdAt = attrs.createdAt;
       if (!createdAt) return;
 
       const { dateStr, shift } = getArgentinaDateTime(createdAt);
-      // Filter out sales that fall outside requested Argentina date range
       if (dateStr < startDate || dateStr > endDate) return;
-
-      const key = `${dateStr}_${shift}`;
 
       const state = attrs.saleState || 'UNKNOWN';
       const total = Number(attrs.total || 0);
       const people = Number(attrs.people || 0);
+
+      const key = `${dateStr}_${shift}`;
 
       if (!shiftMap[key]) {
         shiftMap[key] = {
@@ -255,11 +266,22 @@ export async function POST(request: Request) {
         if (pInfo && (pInfo.cash > 0 || pInfo.digital > 0)) {
           shiftObj.cashAmount += pInfo.cash;
           shiftObj.digitalAmount += pInfo.digital;
+
+          pInfo.payments.forEach(p => {
+            const pmName = p.pmName || 'Efectivo';
+            if (!pmBreakdownMap[pmName]) {
+              pmBreakdownMap[pmName] = { name: pmName, amount: 0, count: 0 };
+            }
+            pmBreakdownMap[pmName].amount += p.amount;
+            pmBreakdownMap[pmName].count += 1;
+          });
         } else {
-          // Fallback if payment detail unlinked
-          const c = Math.round(total * 0.45);
-          shiftObj.cashAmount += c;
-          shiftObj.digitalAmount += (total - c);
+          shiftObj.cashAmount += total;
+          if (!pmBreakdownMap['Efectivo']) {
+            pmBreakdownMap['Efectivo'] = { name: 'Efectivo', amount: 0, count: 0 };
+          }
+          pmBreakdownMap['Efectivo'].amount += total;
+          pmBreakdownMap['Efectivo'].count += 1;
         }
       } else if (state === 'CANCELED') {
         shiftObj.canceledOrdersCount += 1;
@@ -281,7 +303,7 @@ export async function POST(request: Request) {
     const grandCashTotal = shiftSummary.reduce((acc, d) => acc + d.cashAmount, 0);
     const grandDigitalTotal = shiftSummary.reduce((acc, d) => acc + d.digitalAmount, 0);
 
-    // Filter today's summary for live dashboard cards (including active CLOSED, IN-COURSE, PAYMENT-PROCESS sales)
+    // Filter today's summary for live dashboard cards
     const todaySales = allRawSales.filter((sale: any) => {
       const attrs = sale.attributes || {};
       if (!attrs.createdAt || attrs.saleState === 'CANCELED') return false;
@@ -315,9 +337,7 @@ export async function POST(request: Request) {
         todayCash += pInfo.cash;
         todayDigital += pInfo.digital;
       } else {
-        const c = Math.round(total * 0.45);
-        todayCash += c;
-        todayDigital += (total - c);
+        todayCash += total;
       }
     });
 
@@ -353,15 +373,20 @@ export async function POST(request: Request) {
       const rawType = (attrs.saleType || '').toUpperCase();
       const comment = (attrs.comment || '').toLowerCase();
 
+      const pInfo = salePaymentMap[sale.id];
+      const payments = pInfo?.payments || [];
+      const hasPeyaPayment = payments.some(p => p.pmName.toLowerCase().includes('pedidos ya') || p.pmName.toLowerCase().includes('pedidosya') || p.pmId === '8' || p.pmId === '9');
+      const hasPeyaComment = comment.includes('pedidosya') || comment.includes('pedidos ya') || comment.includes('peya');
+
       let targetChannel = 'OTROS';
-      if (rawType === 'EAT-IN') {
+      if (hasPeyaPayment || hasPeyaComment) {
+        targetChannel = 'PEDIDOS_YA';
+      } else if (rawType === 'EAT-IN') {
         targetChannel = 'SALON';
       } else if (rawType === 'TAKEAWAY' || rawType === 'TAKE_AWAY') {
         targetChannel = 'MOSTRADOR';
       } else if (rawType === 'DELIVERY') {
-        if (comment.includes('pedidosya') || comment.includes('pedidos ya') || comment.includes('peya')) {
-          targetChannel = 'PEDIDOS_YA';
-        } else if (comment.includes('rappi')) {
+        if (comment.includes('rappi')) {
           targetChannel = 'RAPPI';
         } else {
           targetChannel = 'DELIVERY';
@@ -409,6 +434,7 @@ export async function POST(request: Request) {
         averageTicketPerCover: grandTotalPeople > 0 ? Math.round(grandTotalGross / grandTotalPeople) : 0,
         averageTicketPerSale: grandTotalOrders > 0 ? Math.round(grandTotalGross / grandTotalOrders) : 0,
       },
+      paymentMethodsBreakdown: Object.values(pmBreakdownMap),
       channelsSummary,
       dailySummary: shiftSummary,
       historicalSales,

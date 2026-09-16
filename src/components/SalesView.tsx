@@ -443,6 +443,57 @@ export const SalesView: React.FC = () => {
         </div>
       </div>
 
+      {/* DESGLOSE POR FORMA DE PAGO REGISTRADA EN FUDO POS */}
+      <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl space-y-4">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+          <div className="flex items-center gap-2">
+            <CreditCard className="w-5 h-5 text-emerald-400" />
+            <div>
+              <h3 className="text-sm font-bold text-white">Formas de Pago Registradas en Fudo POS</h3>
+              <p className="text-[11px] text-slate-400">Totales recaudados por cada método de pago configurado en la caja de Fudo</p>
+            </div>
+          </div>
+          <span className="text-xs font-bold text-slate-400 bg-slate-800 px-3 py-1 rounded-xl">
+            {fudoLive?.paymentMethodsBreakdown ? `${fudoLive.paymentMethodsBreakdown.length} medios de pago` : 'Cargando...'}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          {fudoLive?.paymentMethodsBreakdown && fudoLive.paymentMethodsBreakdown.length > 0 ? (
+            fudoLive.paymentMethodsBreakdown.map((pm: any) => {
+              const grandTotal = fudoLive?.grandTotals?.totalGrossAmount || 1;
+              const pct = Math.round((pm.amount / grandTotal) * 1000) / 10;
+              const isPeya = pm.name.toLowerCase().includes('pedidos ya') || pm.name.toLowerCase().includes('pedidosya');
+              const isMP = pm.name.toLowerCase().includes('mercado') || pm.name.toLowerCase().includes('qr');
+              const isCash = pm.name.toLowerCase().includes('efectivo');
+
+              const cardBorder = isPeya
+                ? 'border-rose-500/30 bg-rose-500/5'
+                : isMP
+                ? 'border-sky-500/30 bg-sky-500/5'
+                : isCash
+                ? 'border-emerald-500/30 bg-emerald-500/5'
+                : 'border-slate-800 bg-slate-950/60';
+
+              return (
+                <div key={pm.name} className={`border p-3 rounded-xl space-y-1.5 ${cardBorder}`}>
+                  <div className="flex items-center justify-between text-[11px] font-bold text-slate-300">
+                    <span className="truncate" title={pm.name}>{pm.name}</span>
+                    <span className="text-[10px] text-amber-400 font-mono">{pct}%</span>
+                  </div>
+                  <div className="text-sm font-black text-white">${pm.amount.toLocaleString('es-AR')}</div>
+                  <div className="text-[10px] text-slate-400 font-medium">{pm.count} transacciones</div>
+                </div>
+              );
+            })
+          ) : (
+            <div className="col-span-6 text-center py-4 text-slate-500 text-xs">
+              Sin información de métodos de pago
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* PANEL DE FILTROS (ALMANAQUE UNIFICADO DESDE/HASTA + TURNO + CANAL + MÉTODO DE PAGO) */}
       <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
