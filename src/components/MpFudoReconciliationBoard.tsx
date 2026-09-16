@@ -38,7 +38,7 @@ export const MpFudoReconciliationBoard: React.FC<MpFudoReconciliationBoardProps>
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<'ALL' | 'RECONCILED' | 'UNMATCHED_FUDO' | 'UNMATCHED_MP' | 'FUDO_CASH' | 'FUDO_POSNET_CARD' | 'FUDO_PEDIDOSYA_ONLINE' | 'MP_TIP' | 'EGRESOS'>('ALL');
+  const [activeTab, setActiveTab] = useState<'ALL' | 'RECONCILED' | 'UNMATCHED_FUDO' | 'UNMATCHED_MP' | 'FUDO_CASH' | 'POSNET_OTHER' | 'PEDIDOS_YA' | 'MP_TIP' | 'EGRESOS'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [showExplanation, setShowExplanation] = useState(true);
 
@@ -79,6 +79,8 @@ export const MpFudoReconciliationBoard: React.FC<MpFudoReconciliationBoardProps>
   const unmatchedFudoRows = useMemo(() => rows.filter(r => r.status === 'UNMATCHED_FUDO'), [rows]);
   const unmatchedMpRows = useMemo(() => rows.filter(r => r.status === 'UNMATCHED_MP'), [rows]);
   const fudoCashRows = useMemo(() => rows.filter(r => r.status === 'FUDO_CASH'), [rows]);
+  const pedidosYaRows = useMemo(() => rows.filter(r => r.status === 'PEDIDOS_YA'), [rows]);
+  const posnetOtherRows = useMemo(() => rows.filter(r => r.status === 'POSNET_OTHER'), [rows]);
   const mpTipRows = useMemo(() => rows.filter(r => r.status === 'MP_TIP'), [rows]);
   const egresosRows = useMemo(() => rows.filter(r => r.status === 'EGRESO_MP'), [rows]);
 
@@ -86,6 +88,8 @@ export const MpFudoReconciliationBoard: React.FC<MpFudoReconciliationBoardProps>
   const unmatchedFudoTotal = useMemo(() => unmatchedFudoRows.reduce((sum, r) => sum + (r.fudoTotal || 0), 0), [unmatchedFudoRows]);
   const unmatchedMpTotal = useMemo(() => unmatchedMpRows.reduce((sum, r) => sum + (r.mpGross || 0), 0), [unmatchedMpRows]);
   const fudoCashTotal = useMemo(() => fudoCashRows.reduce((sum, r) => sum + (r.fudoTotal || 0), 0), [fudoCashRows]);
+  const pedidosYaTotal = useMemo(() => pedidosYaRows.reduce((sum, r) => sum + (r.fudoTotal || 0), 0), [pedidosYaRows]);
+  const posnetOtherTotal = useMemo(() => posnetOtherRows.reduce((sum, r) => sum + (r.fudoTotal || 0), 0), [posnetOtherRows]);
 
   // Total Fudo MP Declared Amount
   const fudoMpDeclared = reconciledTotal + unmatchedFudoTotal;
@@ -108,6 +112,8 @@ export const MpFudoReconciliationBoard: React.FC<MpFudoReconciliationBoardProps>
       if (activeTab === 'UNMATCHED_FUDO' && r.status !== 'UNMATCHED_FUDO') return false;
       if (activeTab === 'UNMATCHED_MP' && r.status !== 'UNMATCHED_MP') return false;
       if (activeTab === 'FUDO_CASH' && r.status !== 'FUDO_CASH') return false;
+      if (activeTab === 'PEDIDOS_YA' && r.status !== 'PEDIDOS_YA') return false;
+      if (activeTab === 'POSNET_OTHER' && r.status !== 'POSNET_OTHER') return false;
       if (activeTab === 'MP_TIP' && r.status !== 'MP_TIP') return false;
       if (activeTab === 'EGRESOS' && r.status !== 'EGRESO_MP') return false;
 
@@ -284,7 +290,7 @@ export const MpFudoReconciliationBoard: React.FC<MpFudoReconciliationBoardProps>
             </button>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-1">
             {/* Matched */}
             <div className="bg-emerald-950/30 border border-emerald-500/30 p-3 rounded-xl space-y-1">
               <div className="font-bold text-emerald-400 flex items-center gap-1.5">
@@ -303,13 +309,41 @@ export const MpFudoReconciliationBoard: React.FC<MpFudoReconciliationBoardProps>
             <div className="bg-rose-950/30 border border-rose-500/30 p-3 rounded-xl space-y-1">
               <div className="font-bold text-rose-400 flex items-center gap-1.5">
                 <AlertCircle className="w-3.5 h-3.5" />
-                Fudo MP sin cobro en MP
+                Fudo MP / QR sin cobro en MP
               </div>
               <div className="text-lg font-black text-white">
                 ${unmatchedFudoTotal.toLocaleString('es-AR')}
               </div>
               <div className="text-[10px] text-slate-400">
-                {unmatchedFudoRows.length} ventas declaradas como MP sin cobro en la cuenta de MP.
+                {unmatchedFudoRows.length} ventas QR/Point MP declaradas sin cobro en MP.
+              </div>
+            </div>
+
+            {/* PedidosYa (Plataforma Externa) */}
+            <div className="bg-rose-950/20 border border-rose-500/20 p-3 rounded-xl space-y-1">
+              <div className="font-bold text-rose-300 flex items-center gap-1.5">
+                <span className="text-xs">📱</span>
+                Ventas PedidosYa (Liq. Plataforma)
+              </div>
+              <div className="text-lg font-black text-white">
+                ${pedidosYaTotal.toLocaleString('es-AR')}
+              </div>
+              <div className="text-[10px] text-slate-400">
+                {pedidosYaRows.length} órdenes cobradas por PedidosYa (no ingresan a MP).
+              </div>
+            </div>
+
+            {/* Posnet Tradicional (Payway / Fiserv) */}
+            <div className="bg-purple-950/30 border border-purple-500/30 p-3 rounded-xl space-y-1">
+              <div className="font-bold text-purple-300 flex items-center gap-1.5">
+                <CreditCard className="w-3.5 h-3.5 text-purple-400" />
+                Posnet Tradicional (Payway/Fiserv)
+              </div>
+              <div className="text-lg font-black text-white">
+                ${posnetOtherTotal.toLocaleString('es-AR')}
+              </div>
+              <div className="text-[10px] text-slate-400">
+                {posnetOtherRows.length} ventas por tarjetas/medios no-MP.
               </div>
             </div>
 
@@ -379,7 +413,29 @@ export const MpFudoReconciliationBoard: React.FC<MpFudoReconciliationBoardProps>
                   : 'text-slate-400 hover:text-white hover:bg-slate-900'
               }`}
             >
-              Descalce Fudo MP 🔴 ({unmatchedFudoRows.length})
+              Descalce QR/MP 🔴 ({unmatchedFudoRows.length})
+            </button>
+
+            <button
+              onClick={() => setActiveTab('PEDIDOS_YA')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                activeTab === 'PEDIDOS_YA'
+                  ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30 shadow-md'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-900'
+              }`}
+            >
+              PedidosYa 📱 ({pedidosYaRows.length})
+            </button>
+
+            <button
+              onClick={() => setActiveTab('POSNET_OTHER')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                activeTab === 'POSNET_OTHER'
+                  ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30 shadow-md'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-900'
+              }`}
+            >
+              Posnet Tradicional 💳 ({posnetOtherRows.length})
             </button>
 
             <button
@@ -467,6 +523,8 @@ export const MpFudoReconciliationBoard: React.FC<MpFudoReconciliationBoardProps>
                   const isUnmatchedFudo = row.status === 'UNMATCHED_FUDO';
                   const isUnmatchedMp = row.status === 'UNMATCHED_MP';
                   const isFudoCash = row.status === 'FUDO_CASH';
+                  const isPedidosYa = row.status === 'PEDIDOS_YA';
+                  const isPosnetOther = row.status === 'POSNET_OTHER';
                   const isMpTip = row.status === 'MP_TIP';
                   const isEgreso = row.status === 'EGRESO_MP';
 
@@ -488,6 +546,16 @@ export const MpFudoReconciliationBoard: React.FC<MpFudoReconciliationBoardProps>
                         {isUnmatchedFudo && (
                           <span className="inline-flex items-center gap-1 bg-rose-500/20 text-rose-300 border border-rose-500/30 text-[10px] font-bold px-2 py-0.5 rounded-full">
                             <AlertCircle className="w-3 h-3 text-rose-400" /> Fudo MP s/ MP
+                          </span>
+                        )}
+                        {isPedidosYa && (
+                          <span className="inline-flex items-center gap-1 bg-rose-500/10 text-rose-300 border border-rose-500/20 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                            📱 PedidosYa
+                          </span>
+                        )}
+                        {isPosnetOther && (
+                          <span className="inline-flex items-center gap-1 bg-purple-500/10 text-purple-300 border border-purple-500/20 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                            💳 Posnet Tradicional
                           </span>
                         )}
                         {isFudoCash && (

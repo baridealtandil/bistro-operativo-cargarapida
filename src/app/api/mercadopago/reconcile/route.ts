@@ -123,7 +123,7 @@ async function getFudoToken() {
 
 const FUDO_PM_NAMES: Record<string, string> = {
   '1': 'Efectivo',
-  '9': 'Efectivo',
+  '9': 'Efectivo Pedidos Ya',
   '2': 'Cta. Cte.',
   '3': 'Tarj. Crédito',
   '4': 'Tarj. Débito',
@@ -490,7 +490,7 @@ export async function POST(request: Request) {
             mpDate: match.dateStr,
             mpDescription: `Conciliado Acreditado (${pmName})`,
           });
-        } else if (pmName.toLowerCase().includes('efectivo')) {
+        } else if (pmName.toLowerCase() === 'efectivo') {
           reconciliationRows.push({
             status: 'FUDO_CASH',
             fudoSaleId: hasSplitPayments ? `${fudoSale.id} (Pago ${pIdx + 1})` : fudoSale.id,
@@ -507,8 +507,42 @@ export async function POST(request: Request) {
             mpDate: fudoSale.dateStr,
             mpDescription: 'Venta Efectivo en Fudo',
           });
+        } else if (pmName.toLowerCase().includes('pedidos ya') || pmName.toLowerCase().includes('pedidosya') || pmName.toLowerCase().includes('peya')) {
+          reconciliationRows.push({
+            status: 'PEDIDOS_YA',
+            fudoSaleId: hasSplitPayments ? `${fudoSale.id} (Pago ${pIdx + 1})` : fudoSale.id,
+            fudoTotal: fpAmount,
+            fudoShift: fudoSale.shift,
+            fudoDate: fudoSale.dateStr,
+            fudoPmName: pmName,
+            mpPaymentId: null,
+            mpGross: 0,
+            mpNet: 0,
+            mpFee: 0,
+            mpTax: 0,
+            mpDevice: 'N/A',
+            mpDate: fudoSale.dateStr,
+            mpDescription: 'Venta PedidosYa (Liquidación por Plataforma)',
+          });
+        } else if (pmName.toLowerCase().includes('tarj') || pmName.toLowerCase().includes('débito') || pmName.toLowerCase().includes('debito') || pmName.toLowerCase().includes('crédito') || pmName.toLowerCase().includes('credito') || pmName.toLowerCase().includes('cta') || pmName.toLowerCase().includes('cheque')) {
+          reconciliationRows.push({
+            status: 'POSNET_OTHER',
+            fudoSaleId: hasSplitPayments ? `${fudoSale.id} (Pago ${pIdx + 1})` : fudoSale.id,
+            fudoTotal: fpAmount,
+            fudoShift: fudoSale.shift,
+            fudoDate: fudoSale.dateStr,
+            fudoPmName: pmName,
+            mpPaymentId: null,
+            mpGross: 0,
+            mpNet: 0,
+            mpFee: 0,
+            mpTax: 0,
+            mpDevice: 'N/A',
+            mpDate: fudoSale.dateStr,
+            mpDescription: `Cobro ${pmName} en Posnet / Medio no-MP`,
+          });
         } else {
-          // Fudo Mercado Pago sale without MP income match
+          // Fudo Mercado Pago / QR sale without MP income match
           reconciliationRows.push({
             status: 'UNMATCHED_FUDO',
             fudoSaleId: hasSplitPayments ? `${fudoSale.id} (Pago ${pIdx + 1})` : fudoSale.id,
