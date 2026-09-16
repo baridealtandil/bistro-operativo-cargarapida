@@ -392,7 +392,7 @@ export async function POST(request: Request) {
         const included = fData.included || [];
 
         included.forEach((inc: any) => {
-          if (inc.type === 'Payment') {
+          if (inc.type === 'Payment' && !inc.attributes?.canceled) {
             const saleId = inc.relationships?.sale?.data?.id;
             const pmId = inc.relationships?.paymentMethod?.data?.id;
             const amount = Number(inc.attributes?.amount || 0);
